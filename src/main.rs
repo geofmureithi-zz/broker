@@ -37,8 +37,6 @@ async fn download(data: web::Data<MyData>, broad: web::Data<std::sync::Mutex<Bro
 
 async fn index(data: web::Data<MyData>) -> impl Responder {
 
-    // let content = include_str!("index.html");
-
     let counter_buffer = data.db.get(b"counter").unwrap().unwrap();
     
     let counter = std::str::from_utf8(&counter_buffer).unwrap();
