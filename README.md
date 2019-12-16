@@ -1,4 +1,4 @@
-# Download Counter Example using Actix Web and Sled
+# Download Counter Example using Actix Web, SSE, and Sled
 
 ## Use
 
