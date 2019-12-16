@@ -19,7 +19,7 @@
         let data = document.createElement("p");
         root.appendChild(data);
         events.onmessage = (event) => {
-            if (event.data != "ping") {
+            if (event.data != "ping" && event.data != "connected") {
                 data.innerText = event.data;
             }
         }
