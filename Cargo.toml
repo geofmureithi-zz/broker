@@ -1,0 +1,17 @@
+[package]
+name = "download-counter-example"
+version = "0.0.1"
+authors = ["Bevan Hunt <bevan@bevanhunt.com>"]
+edition = "2018"
+license = "MIT"
+description = "Download Counter Example"
+repository = "https://github.com/apibillme/download-counter-example"
+
+[dependencies]
+actix-rt = "1.0.0"
+actix-web = "2.0.0-alpha.6"
+actix-files = "0.2.0-alpha.3"
+futures = "0.3.1"
+tokio = "0.2.4"
+sse-actix-web="0.0.1"
+sled = "0.30.0"
