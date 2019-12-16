@@ -25,10 +25,9 @@ async fn download(data: web::Data<MyData>, broad: web::Data<std::sync::Mutex<Bro
 
     broadcast(counter, broad).await;
 
-    let f = web::block(|| std::fs::File::create("test.jpg")).await.unwrap();
+    let f = web::block(|| std::fs::File::create("test.pdf")).await.unwrap();
     
-    // BUG: this should return content-disposition attachment not inline
-    NamedFile::from_file(f, "test.jpg")
+    NamedFile::from_file(f, "test.pdf")
 }
 
 async fn index() -> impl Responder {
