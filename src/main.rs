@@ -4,8 +4,8 @@ use sse_actix_web::{new_client, Broadcaster, broadcast};
 use sled::Db;
 use actix_files::NamedFile;
 
-struct MyData {
-    db: sled::Db,
+pub struct MyData {
+    db: sled::Db
 }
 
 async fn download(data: web::Data<MyData>, broad: web::Data<std::sync::Mutex<Broadcaster>>) -> io::Result<NamedFile> {
@@ -22,7 +22,7 @@ async fn download(data: web::Data<MyData>, broad: web::Data<std::sync::Mutex<Bro
 
     let _ = web::block(move || data.db.flush()).await;
 
-    broadcast(counter, broad).await;
+    broadcast(counter.to_owned(), broad).await;
 
     let f = web::block(|| std::fs::File::create("test.pdf")).await.unwrap();
     
@@ -30,6 +30,7 @@ async fn download(data: web::Data<MyData>, broad: web::Data<std::sync::Mutex<Bro
 }
 
 async fn index() -> impl Responder {
+
     let content = include_str!("index.html");
 
     HttpResponse::Ok()
@@ -39,14 +40,15 @@ async fn index() -> impl Responder {
 
 #[actix_rt::main]
 async fn main() -> std::io::Result<()> {
-    let data = Broadcaster::create();
     let tree = Db::open("./tmp/data").unwrap();
-    tree.insert(b"counter", b"0").unwrap();
+    let counter_buffer = tree.get(b"counter").unwrap().unwrap();
+    let counter = std::str::from_utf8(&counter_buffer).unwrap().to_owned();
+    let data = Broadcaster::create(counter.to_string());
 
     HttpServer::new(move || {
         App::new()
             .register_data(data.clone())
-            .data(MyData{ db: tree.clone() })
+            .data(MyData{ db: tree.clone()})
             .route("/", web::get().to(index))
             .route("/events", web::get().to(new_client))
             .route("/download", web::get().to(download))

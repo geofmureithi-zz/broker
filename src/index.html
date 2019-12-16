@@ -16,11 +16,12 @@
     <script>
         let root = document.getElementById("root");
         let events = new EventSource("/events");
+        let data = document.createElement("p");
+        root.appendChild(data);
         events.onmessage = (event) => {
-            let data = document.createElement("p");
-            let time = new Date().toLocaleTimeString();
-            data.innerText = time + ": " + event.data;
-            root.appendChild(data);
+            if (event.data != "ping") {
+                data.innerText = event.data;
+            }
         }
     </script>
 </body>
