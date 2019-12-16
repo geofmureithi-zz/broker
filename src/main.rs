@@ -1,7 +1,6 @@
 use std::io::{self};
 use actix_web::{web, HttpServer, HttpResponse, App, Responder};
-mod lib;
-use lib::{new_client, Broadcaster, broadcast};
+use sse_actix_web::{new_client, Broadcaster, broadcast};
 use sled::Db;
 use actix_files::NamedFile;
 
