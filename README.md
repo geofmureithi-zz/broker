@@ -4,4 +4,6 @@
 
 - ``` cargo run ```
 
-- open localhost:3000 and run ``` make ```
+- open /client and ``` npm start ```
+
+- open localhost:3000 and run ``` make ``` from the command line - you should see the name Rusty

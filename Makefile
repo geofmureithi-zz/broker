@@ -1,2 +1,2 @@
 msg:
-	curl -S --header "Content-Type: application/json" --request POST --data '{"name":"hello world"}'  http://localhost:3000
+	curl -S --header "Content-Type: application/json" --request POST --data '{"name":"Rusty"}'  http://localhost:8080/name

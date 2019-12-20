@@ -1,21 +1,17 @@
 [package]
-name = "download-counter-example"
+name = "sse-json"
 version = "0.0.1"
 authors = ["Bevan Hunt <bevan@bevanhunt.com>"]
 edition = "2018"
 license = "MIT"
-description = "Download Counter Example"
-repository = "https://github.com/apibillme/download-counter-example"
 
 [dependencies]
 actix-rt = "1.0.0"
-actix-web = "2.0.0-alpha.6"
-actix-files = "0.2.0-alpha.3"
+actix-web = "2.0.0-rc"
 futures = "0.3.1"
 tokio = "0.2.4"
-sse-actix-web="0.5.1"
+sse-actix-web="0.5.2"
 serde = "1.0.103"
 serde_json = "1.0.44"
 serde_derive = "1.0.103"
 json = "0.12.0"
-
