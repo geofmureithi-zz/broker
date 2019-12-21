@@ -3,14 +3,21 @@ use sse_actix_web::{new_client, Broadcaster, broadcast};
 use serde_derive::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
-struct MyUser {
+struct Data {
     name: String,
 }
 
-async fn send(broad: web::Data<std::sync::Mutex<Broadcaster>>, json: web::Json<MyUser>,) -> Result<HttpResponse, Error> {
-    let user_string = serde_json::to_string(&json.0).unwrap();
-    broadcast("message".to_owned(), user_string, broad.clone()).await;
-    Ok(HttpResponse::Ok().json(json.0))
+#[derive(Debug, Serialize, Deserialize)]
+struct JSON {
+    event: String,
+    data: Data,
+
+}
+
+async fn send(broad: web::Data<std::sync::Mutex<Broadcaster>>, json: web::Json<JSON>) -> Result<HttpResponse, Error> {
+    let user_string = serde_json::to_string(&json.0.data).unwrap();
+    broadcast(json.0.event, user_string, broad.clone()).await;
+    Ok(HttpResponse::Ok().json(json.0.data))
 }
 
 #[actix_rt::main]

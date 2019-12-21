@@ -21,7 +21,7 @@ const useStyles = makeStyles({
 });
 
 const Comments = () => {
-  const state = useSSE('message', {
+  const state = useSSE('name', {
     initialState: {
       data: {
         value: null,
