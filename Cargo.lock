@@ -1186,7 +1186,7 @@ dependencies = [
 
 [[package]]
 name = "sse-actix-web"
-version = "0.6.0"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "actix-rt 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1207,7 +1207,7 @@ dependencies = [
  "serde_derive 1.0.104 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.44 (registry+https://github.com/rust-lang/crates.io-index)",
  "sled 0.30.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "sse-actix-web 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "sse-actix-web 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -1559,7 +1559,7 @@ dependencies = [
 "checksum sled 0.30.3 (registry+https://github.com/rust-lang/crates.io-index)" = "2eb8c32cb0e34e67ad74fae1a77f4635d0cc7ffc873088a0136f3c4849336d71"
 "checksum smallvec 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "44e59e0c9fa00817912ae6e4e6e3c4fe04455e75699d06eedc7d85917ed8e8f4"
 "checksum socket2 0.3.11 (registry+https://github.com/rust-lang/crates.io-index)" = "e8b74de517221a2cb01a53349cf54182acdc31a074727d3079068448c0676d85"
-"checksum sse-actix-web 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)" = "867b73dae9088ca7c832db65634c484912619a64918fa12d8c6a8457243bc3ef"
+"checksum sse-actix-web 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)" = "0a9df8ca19c519ccafceb53ceb24456234c5ce31374a05b2c168b205d7194cac"
 "checksum syn 1.0.11 (registry+https://github.com/rust-lang/crates.io-index)" = "dff0acdb207ae2fe6d5976617f887eb1e35a2ba52c13c7234c790960cdad9238"
 "checksum synstructure 0.12.3 (registry+https://github.com/rust-lang/crates.io-index)" = "67656ea1dc1b41b1451851562ea232ec2e5a80242139f7e679ceccfb5d61f545"
 "checksum thread_local 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)" = "c6b53e329000edc2b34dbe8545fd20e55a333362d0a321909685a19bd28c3f1b"
