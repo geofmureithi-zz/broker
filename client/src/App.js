@@ -21,7 +21,7 @@ const useStyles = makeStyles({
 });
 
 const Comments = () => {
-  const state = useSSE('name', {
+  const state = useSSE('user', {
     initialState: {
       data: {
         value: null,
@@ -35,7 +35,7 @@ const Comments = () => {
     },
   });
 
-  return <span>{state.data.name !== null && <span>{state.data.name}</span>}</span>;
+  return <span>{state.data.user !== null && <span>{state.data.user}</span>}</span>;
 };
 
 function App() {
