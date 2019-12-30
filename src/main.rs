@@ -5,6 +5,11 @@ use std::sync::Mutex;
 use sled;
 use actix_cors::Cors;
 
+#[derive(Deserialize, Debug)]
+struct Config {
+  port: i32
+}
+
 pub struct MyData {
     db: sled::Db
 }
@@ -57,6 +62,9 @@ async fn insert(data: web::Data<MyData>, broad: web::Data<Mutex<Broadcaster>>, j
 
 #[actix_rt::main]
 async fn main() -> std::io::Result<()> {
+    let config = envy::from_env::<Config>().unwrap();
+    let ip = format!("0.0.0.0:{}", config.port);
+  
     let tree = sled::open("./tmp/data").unwrap();
     let tree_clone = tree.clone();
     let _ = tree.compare_and_swap(b"user", None as Option<&[u8]>, Some(b""));
@@ -80,7 +88,7 @@ async fn main() -> std::io::Result<()> {
             .route("/insert", web::post().to(insert))
             .route("/events", web::get().to(new_client))
     })
-    .bind("0.0.0.0:8080")?
+    .bind(ip)?
     .run()
     .await
 }
