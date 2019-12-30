@@ -46,7 +46,7 @@ function App() {
        <CardContent>
         <Typography className={classes.title} color="textSecondary" gutterBottom>
           What is your name?&nbsp;
-            <SSEProvider endpoint="http://localhost:8080/events" options={{withCredentials: false}}>
+            <SSEProvider endpoint={process.env.REACT_APP_EVENTS} options={{withCredentials: false}}>
               <Comments />
             </SSEProvider>
           </Typography>
