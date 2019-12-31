@@ -5,7 +5,6 @@ use serde_derive::{Deserialize, Serialize};
 use std::sync::Mutex;
 use sled;
 use actix_cors::Cors;
-use ws_actix_web::{ws_index};
 
 #[derive(Deserialize, Debug)]
 struct Config {
@@ -68,7 +67,6 @@ async fn main() -> std::io::Result<()> {
     env_logger::init();
     let config = envy::from_env::<Config>().unwrap();
     let ip = format!("0.0.0.0:{}", config.port);
-    let ws_ip = format!("http://0.0.0.0:{}/ws/", config.port);
   
     let tree = sled::open("./tmp/data").unwrap();
     let tree_clone = tree.clone();
@@ -90,11 +88,9 @@ async fn main() -> std::io::Result<()> {
             )
             .app_data(data.clone())
             .data(MyData{ db: tree_clone.clone()})
-            .data(Config{ port: ws_ip.clone()})
             .app_data(web::JsonConfig::default())
             .route("/insert", web::post().to(insert))
             .route("/events", web::get().to(new_client))
-            .service(web::resource("/ws/").route(web::get().to(ws_index)))
     })
     .bind(ip)?
     .run()
