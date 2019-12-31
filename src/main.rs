@@ -1,4 +1,3 @@
-#![feature(async_closure)]
 use actix_web::{http::header, middleware, web, HttpServer, HttpResponse, App, Error, Responder};
 use sse_actix_web::{Broadcaster, broadcast};
 use serde_derive::{Deserialize, Serialize};
