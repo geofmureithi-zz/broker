@@ -60,9 +60,6 @@ function App() {
       console.log(err);
     });
   };
-  const onBlur = evt => {
-    evt.target.value = "";
-  };
 
   return (
     <div>
@@ -81,7 +78,6 @@ function App() {
                 minLength={2}
                 debounceTimeout={300}
                 onChange={handleSubmit(onSubmit)}
-                onBlur={onBlur}
                 inputRef={register({})}
               />
               {errors.user && errors.user.message}
