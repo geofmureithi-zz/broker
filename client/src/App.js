@@ -53,11 +53,14 @@ function App() {
         'Content-Type': 'application/json'
       },
       body: v
-    }).then(function(response) {
+    }).then(response => {
       return response.json();
     }, err => {
       console.log(err);
     });
+  };
+  const onBlur = evt => {
+    evt.target.value = "";
   };
 
   return (
@@ -72,7 +75,7 @@ function App() {
           </Typography>
           <form onChange={handleSubmit(onSubmit)}>
               <label htmlFor="user">Name: </label>
-              <input name="user" ref={register({})} />
+              <input name="user" ref={register({})} onBlur={onBlur} />
               {errors.user && errors.user.message}
           </form>
         </CardContent>
