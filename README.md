@@ -1,5 +1,7 @@
 # SSE server using Actix Web
 
+[![crates.io](https://meritbadge.herokuapp.com/sse-server)](https://crates.io/crates/sse-server)
+
 ## Use
 
 ```rust
