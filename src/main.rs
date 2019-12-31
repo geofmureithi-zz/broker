@@ -16,14 +16,9 @@ pub struct MyData {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct Data {
-    user: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
 struct JSON {
     event: String,
-    data: Data,
+    data: serde_json::Value,
 }
 
 async fn new_client(data: web::Data<MyData>, broad: web::Data<Mutex<Broadcaster>>) -> impl Responder {
