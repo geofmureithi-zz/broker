@@ -5,6 +5,7 @@ import { useSSE, SSEProvider } from 'react-hooks-sse';
 import CardContent from '@material-ui/core/CardContent';
 import Typography from '@material-ui/core/Typography';
 import { useForm } from "react-hook-form";
+import {DebounceInput} from 'react-debounce-input';
 
 const useStyles = makeStyles({
   card: {
@@ -75,7 +76,14 @@ function App() {
           </Typography>
           <form onChange={handleSubmit(onSubmit)}>
               <label htmlFor="user">Name: </label>
-              <input name="user" ref={register({})} onBlur={onBlur} />
+              <DebounceInput
+                name="user"
+                minLength={2}
+                debounceTimeout={300}
+                onChange={handleSubmit(onSubmit)}
+                onBlur={onBlur}
+                inputRef={register({})}
+              />
               {errors.user && errors.user.message}
           </form>
         </CardContent>
