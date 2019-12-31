@@ -1,1 +1,1 @@
-web: ./target/release/json-sse
+web: ./target/release/sse-server
