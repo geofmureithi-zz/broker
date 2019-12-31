@@ -4,7 +4,7 @@ import Card from '@material-ui/core/Card';
 import { useSSE, SSEProvider } from 'react-hooks-sse';
 import CardContent from '@material-ui/core/CardContent';
 import Typography from '@material-ui/core/Typography';
-import { Formik, Field, Form } from 'formik';
+import { useForm } from "react-hook-form";
 
 const useStyles = makeStyles({
   card: {
@@ -43,6 +43,23 @@ function App() {
   const classes = useStyles();
   const sseEndpoint = process.env.REACT_APP_EVENTS;
   const apiEndpoint = process.env.REACT_APP_API;
+  const { handleSubmit, register, errors } = useForm();
+  const onSubmit = values => {
+    const v = `{"event": "user", "data": {"user": "${values.user}"}}`;
+    fetch(apiEndpoint, {
+      method: 'post',
+      mode: 'cors',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: v
+    }).then(function(response) {
+      return response.json();
+    }, err => {
+      console.log(err);
+    });
+  };
+
   return (
     <div>
       <Card className={classes.card}>
@@ -53,36 +70,12 @@ function App() {
               <Comments />
             </SSEProvider>
           </Typography>
-          <Formik
-            initialValues={{
-              name: ''
-            }}
-            onSubmit={values => {
-              const v = `{"event": "user", "data": {"user": "${values.user}"}}`;
-              fetch(apiEndpoint, {
-                method: 'post',
-                mode: 'cors',
-                headers: {
-                  'Content-Type': 'application/json'
-                },
-                body: v
-              }).then(function(response) {
-                return response.json();
-              }, err => {
-                console.log(err);
-              }).then(function(data) {
-                console.log(data);
-              });
-            }}
-            >
-            {(props) => (
-              <Form>
-                <label htmlFor="user">Name: </label>
-                <Field name="user" placeholder="Jane" />
-                <button type="submit">Submit</button>
-              </Form>
-              )}
-          </Formik>
+          <form onSubmit={handleSubmit(onSubmit)}>
+              <label htmlFor="user">Name: </label>
+              <input name="user" ref={register({required: 'Required'})} />
+              {errors.user && errors.user.message}
+              <button type="submit">Submit</button>
+          </form>
         </CardContent>
       </Card>
     </div>
