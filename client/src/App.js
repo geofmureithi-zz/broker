@@ -4,6 +4,7 @@ import Card from '@material-ui/core/Card';
 import { useSSE, SSEProvider } from 'react-hooks-sse';
 import CardContent from '@material-ui/core/CardContent';
 import Typography from '@material-ui/core/Typography';
+import { Formik, Field, Form } from 'formik';
 
 const useStyles = makeStyles({
   card: {
@@ -40,17 +41,48 @@ const Comments = () => {
 
 function App() {
   const classes = useStyles();
-  const endpoint = process.env.REACT_APP_EVENTS;
+  const sseEndpoint = process.env.REACT_APP_EVENTS;
+  const apiEndpoint = process.env.REACT_APP_API;
   return (
     <div>
       <Card className={classes.card}>
        <CardContent>
         <Typography className={classes.title} color="textSecondary" gutterBottom>
           What is your name?&nbsp;
-            <SSEProvider endpoint={endpoint} options={{withCredentials: false}}>
+            <SSEProvider endpoint={sseEndpoint} options={{withCredentials: false}}>
               <Comments />
             </SSEProvider>
           </Typography>
+          <Formik
+            initialValues={{
+              name: ''
+            }}
+            onSubmit={values => {
+              const v = `{"event": "user", "data": {"user": "${values.user}"}}`;
+              fetch(apiEndpoint, {
+                method: 'post',
+                mode: 'cors',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: v
+              }).then(function(response) {
+                return response.json();
+              }, err => {
+                console.log(err);
+              }).then(function(data) {
+                console.log(data);
+              });
+            }}
+            >
+            {(props) => (
+              <Form>
+                <label htmlFor="user">Name: </label>
+                <Field name="user" placeholder="Jane" />
+                <button type="submit">Submit</button>
+              </Form>
+              )}
+          </Formik>
         </CardContent>
       </Card>
     </div>
