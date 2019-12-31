@@ -70,11 +70,10 @@ function App() {
               <Comments />
             </SSEProvider>
           </Typography>
-          <form onSubmit={handleSubmit(onSubmit)}>
+          <form onChange={handleSubmit(onSubmit)}>
               <label htmlFor="user">Name: </label>
-              <input name="user" ref={register({required: 'Required'})} />
+              <input name="user" ref={register({})} />
               {errors.user && errors.user.message}
-              <button type="submit">Submit</button>
           </form>
         </CardContent>
       </Card>
