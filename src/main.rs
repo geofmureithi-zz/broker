@@ -27,7 +27,7 @@ struct JSON {
 
 async fn new_client(data: web::Data<MyData>, broad: web::Data<Mutex<Broadcaster>>) -> impl Responder {
 
-    let user_buffer = data.db.get(b"user").unwrap().unwrap();
+    let user_buffer = data.db.get("user").unwrap().unwrap();
     
     let user = std::str::from_utf8(&user_buffer).unwrap();
 
@@ -43,7 +43,7 @@ async fn insert(data: web::Data<MyData>, broad: web::Data<Mutex<Broadcaster>>, j
 
     let user_string = serde_json::to_string(&json.0.data).unwrap();
 
-    let user_buffer = data.db.get(b"user").unwrap().unwrap();
+    let user_buffer = data.db.get(json.0.event.clone()).unwrap().unwrap();
     
     let user = std::str::from_utf8(&user_buffer).unwrap();
     
@@ -51,11 +51,11 @@ async fn insert(data: web::Data<MyData>, broad: web::Data<Mutex<Broadcaster>>, j
     
     let old_user = user.clone().as_bytes();
 
-    let _ = data.db.compare_and_swap(b"user", Some(old_user.clone()), Some(new_user.clone()));
+    let _ = data.db.compare_and_swap(json.0.event.clone(), Some(old_user.clone()), Some(new_user.clone()));
 
     let _ = web::block(move || data.db.flush()).await;
 
-    broadcast(json.0.event, serde_json::to_string(&json.0.data).unwrap(), broad.clone()).await;
+    broadcast(json.0.event.clone(), serde_json::to_string(&json.0.data).unwrap(), broad.clone()).await;
 
     Ok(HttpResponse::Ok().json(json.0.data))
 }
