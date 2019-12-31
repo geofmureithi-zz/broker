@@ -40,13 +40,14 @@ const Comments = () => {
 
 function App() {
   const classes = useStyles();
+  const endpoint = process.env.REACT_APP_EVENTS;
   return (
     <div>
       <Card className={classes.card}>
        <CardContent>
         <Typography className={classes.title} color="textSecondary" gutterBottom>
           What is your name?&nbsp;
-            <SSEProvider endpoint={process.env.REACT_APP_EVENTS} options={{withCredentials: false}}>
+            <SSEProvider endpoint={endpoint} options={{withCredentials: false}}>
               <Comments />
             </SSEProvider>
           </Typography>
