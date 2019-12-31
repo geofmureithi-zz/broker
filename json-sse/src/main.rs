@@ -4,6 +4,7 @@ use serde_derive::{Deserialize, Serialize};
 use std::sync::Mutex;
 use sled;
 use actix_cors::Cors;
+use std::collections::HashMap;
 
 #[derive(Deserialize, Debug)]
 struct Config {
@@ -27,11 +28,16 @@ struct JSON {
 
 async fn new_client(data: web::Data<MyData>, broad: web::Data<Mutex<Broadcaster>>) -> impl Responder {
 
-    let user_buffer = data.db.get("user").unwrap().unwrap();
-    
-    let user = std::str::from_utf8(&user_buffer).unwrap();
+    let iter = data.db.iter();
 
-    let rx = broad.lock().unwrap().new_client(&"user", user);
+    let vals: HashMap<String, String> = iter.into_iter().map(|x| {
+        let p = x.unwrap();
+        let k = std::str::from_utf8(&p.0).unwrap().to_owned();
+        let v = std::str::from_utf8(&p.1).unwrap().to_owned();
+        (k, v)
+    }).collect();
+
+    let rx = broad.lock().unwrap().new_client(vals);
 
     HttpResponse::Ok()
         .header("content-type", "text/event-stream")
@@ -40,6 +46,12 @@ async fn new_client(data: web::Data<MyData>, broad: web::Data<Mutex<Broadcaster>
 }
 
 async fn insert(data: web::Data<MyData>, broad: web::Data<Mutex<Broadcaster>>, json: web::Json<JSON>) -> Result<HttpResponse, Error> {
+
+    let data_cloned = data.clone();
+
+    let _ = data_cloned.db.compare_and_swap(json.0.event.clone(), None as Option<&[u8]>, Some(b""));
+    
+    let _ = web::block(move || data_cloned.db.flush()).await;
 
     let user_string = serde_json::to_string(&json.0.data).unwrap();
 
@@ -69,8 +81,6 @@ async fn main() -> std::io::Result<()> {
   
     let tree = sled::open("./tmp/data").unwrap();
     let tree_clone = tree.clone();
-    let _ = tree.compare_and_swap(b"user", None as Option<&[u8]>, Some(b""));
-    let _ = web::block(move || tree.flush()).await;
 
     let data = Broadcaster::create();
 
