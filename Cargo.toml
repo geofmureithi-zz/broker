@@ -5,7 +5,7 @@ authors = ["Bevan Hunt <bevan@bevanhunt.com>"]
 edition = "2018"
 license = "MIT"
 keywords = ["sse", "actix-web", "sse-server"]
-description = "SSE server with Actix Web"
+description = "SSE server using Actix Web"
 repository = "https://github.com/apibillme/sse-server"
 readme = "README.md"
 
