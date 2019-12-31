@@ -4,6 +4,10 @@ version = "0.0.1"
 authors = ["Bevan Hunt <bevan@bevanhunt.com>"]
 edition = "2018"
 license = "MIT"
+keywords = ["sse", "actix-web", "sse-server"]
+description = "SSE server with Actix Web"
+repository = "https://github.com/apibillme/sse-server"
+readme = "README.md"
 
 [dependencies]
 actix-rt = "1.0.0"
@@ -19,4 +23,3 @@ json = "0.12.0"
 sled = "0.30.3"
 envy = "0.4.0"
 env_logger = "0.6"
-actix-server = "1.0.1"
