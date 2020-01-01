@@ -1,14 +1,16 @@
-## Broker - Front-end Real-time Message Broker
+## Broker - SSE Real-time Message Broker
 
 [![crates.io](https://meritbadge.herokuapp.com/broker)](https://crates.io/crates/broker)
 
 ### Purpose
 
-The purpose of this library is to provide a real-time front-end message broker using SSE and a JSON API. 
+The purpose of this library is to provide a SSE real-time message broker. 
 
-Broker is born from the need that rather than building a complex REST API with web-sockets to provide reactive web forms there is a simpler way.
+Broker is born from the need that rather than building a complex REST API with web-sockets to provide reactive web forms there must be a simpler way.
 
 Broker follows an insert-only/publish/subscribe paradigm rather than a REST CRUD paradigm. 
+
+### How it works
 
 In Broker you insert an event and its data via a JSON POST request (/insert). Broker publishes the latest event to an event stream via SSE (/events) and keeps all older versions in its database that can be viewed in a JSON GET request (/audit/{event}).
 
