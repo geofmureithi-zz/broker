@@ -1,11 +1,11 @@
 [package]
 name = "broker"
-version = "0.2.5"
+version = "0.2.6"
 authors = ["Bevan Hunt <bevan@bevanhunt.com>"]
 edition = "2018"
 license = "MIT"
 keywords = ["sse", "message-broker", "sse-server", "broker", "real-time"]
-description = "SSE Real-time Message Broker"
+description = "Real-time Web Server (SSE)"
 repository = "https://github.com/apibillme/broker"
 readme = "README.md"
 

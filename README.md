@@ -4,7 +4,7 @@
 
 ### Purpose
 
-The purpose of this library is to be your real-time web server (SSE) including an embedded database.
+The purpose of this library is to be your real-time web server (SSE) that includes an embedded database.
 
 Broker is born from the need that rather than building a complex REST API with web-sockets to provide reactive web forms (like for React) there must be a simpler way.
 
