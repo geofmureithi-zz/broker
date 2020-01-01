@@ -1,15 +1,15 @@
-# SSE server using Actix Web
+# Biller - Front-end Message Bus using SSE
 
-[![crates.io](https://meritbadge.herokuapp.com/sse-server)](https://crates.io/crates/sse-server)
+[![crates.io](https://meritbadge.herokuapp.com/biller](https://crates.io/crates/biller)
 
 ## Use
 
 ```rust
-use sse_server::{sse_start};
+use biller::{biller_run};
 
 #[actix_rt::main]
 async fn main() -> std::result::Result<(), std::io::Error> {
-    sse_start("*".to_owned()).await
+    biller_run("*".to_owned()).await
 }
 ```
 
@@ -23,4 +23,4 @@ async fn main() -> std::result::Result<(), std::io::Error> {
 
 ## Example
 
-- https://sse-demo.mynextlevel.dev
+- https://biller-demo.apibill.me

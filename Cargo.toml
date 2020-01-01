@@ -1,12 +1,12 @@
 [package]
-name = "sse-server"
-version = "0.0.2"
+name = "biller"
+version = "0.1.0"
 authors = ["Bevan Hunt <bevan@bevanhunt.com>"]
 edition = "2018"
 license = "MIT"
-keywords = ["sse", "actix-web", "sse-server"]
-description = "SSE server using Actix Web"
-repository = "https://github.com/apibillme/sse-server"
+keywords = ["sse", "actix-web", "sse-server", "message-bus", "front-end", "api"]
+description = "Front-end Message Bus using SSE"
+repository = "https://github.com/apibillme/biller"
 readme = "README.md"
 
 [dependencies]
