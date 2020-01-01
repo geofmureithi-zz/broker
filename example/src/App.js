@@ -71,12 +71,12 @@ function App() {
               <Comments />
             </SSEProvider>
           </Typography>
-          <form onChange={handleSubmit(onSubmit)}>
+          <form>
               <label htmlFor="user">Name: </label>
               <DebounceInput
                 name="user"
                 minLength={2}
-                debounceTimeout={300}
+                debounceTimeout={500}
                 onChange={handleSubmit(onSubmit)}
                 inputRef={register({})}
               />

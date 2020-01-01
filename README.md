@@ -19,7 +19,7 @@ async fn main() -> std::result::Result<(), std::io::Error> {
 
 ## Example
 
-- run ``` make ``` and ``` cd example && npm i && npm start ``` to run example
+- run ``` make ``` and ``` make client ``` in two different terminal windows to run example
 
 ## Example
 
