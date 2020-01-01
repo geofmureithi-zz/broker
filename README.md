@@ -14,7 +14,7 @@ Broker follows an insert-only/publish/subscribe paradigm rather than a REST CRUD
 
 In Broker you insert an event and its data via a JSON POST request (/insert). Broker publishes the latest event to an event stream via SSE (/events) and keeps all versions in its database that can be viewed in a JSON GET request (/audit/{event}).
 
-When the client first subscribes to the SSE connection (/events) all the latest events and data is sent to the client. Combined with sending the latest event via SSE when subscribed negates any necessity to do any GET API requests in the lifecycle of events.
+When the client first subscribes to the SSE connection (/events) all the latest events and data is sent to the client. Combined with sending the latest event via SSE when subscribed negates any necessity to do any GET API requests in the lifecycle of an event.
 
 The side-effect of this system is that the latest event is the schema. Old events are saved in the database and are not changed but the latest event is the schema for the front-end. This is pure NoSQL as the backend is agnostic to the event data.
 
@@ -22,10 +22,12 @@ The side-effect of this system is that the latest event is the schema. Old event
 
 * Real-time Event Stream via SSE
 * CORS support
+* Handles SSE client timeouts
 * Stateful immutable event persistence
 * JSON POST API to insert events 
-* Sync latest events on client connection
-* Audit log of event inserts
+* Sync latest events on SSE client connection
+* Audit log of events
+* Very performant with low memory footprint
 
 ### Use
 
@@ -41,6 +43,20 @@ async fn main() -> std::result::Result<(), std::io::Error> {
 - the only param is the origin you want to allow - wildcard for all
 - the PORT needs to passed in as an environment variable
 
+### Endpoints
+
+``` /events ```
+- connect your sse-client to this endpoint
+
+```/insert ```
+- POST JSON to insert an event
+```json
+{"event":{...}, "data":{...}}
+```
+- where {...} is for the event a string and data is any JSON you want
+
+``` /audit/{event} ```
+- do a GET request where {event} is the name of the event you want the audit log
 
 ### Example
 
