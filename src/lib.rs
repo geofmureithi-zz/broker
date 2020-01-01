@@ -112,7 +112,7 @@ async fn insert(data: web::Data<MyData>, broad: web::Data<Mutex<Broadcaster>>, j
     Ok(HttpResponse::Ok().json(json.0.data))
 }
 
-pub async fn biller_run(origin: String) -> std::result::Result<(), std::io::Error> {
+pub async fn broker_run(origin: String) -> std::result::Result<(), std::io::Error> {
     // set actix web env vars
     std::env::set_var("RUST_LOG", "actix_web=debug,actix_server=info");
     env_logger::init();
