@@ -12,7 +12,7 @@ const useStyles = makeStyles({
     minWidth: 275,
     position: "absolute",
     top: "50%",
-    left: "50%",
+    left: "50%", 
     backgroundColor: "yellow",
     transform: "translateX(-50%) translateY(-50%)"
   },
@@ -36,7 +36,7 @@ const Comments = () => {
     },
   });
 
-  return <span>{state.data.user !== null && <span>{state.data.user}</span>}</span>;
+  return <p>{state.data.user !== null && <span>{state.data.user}</span>}</p>;
 };
 
 function App() {
@@ -64,7 +64,7 @@ function App() {
     <div>
       <Card className={classes.card}>
        <CardContent>
-        <Typography className={classes.title} color="textSecondary" gutterBottom>
+        <Typography className={classes.title} color="textSecondary" gutterBottom component={'span'} variant={'body2'}>
           What is your name?&nbsp;
             <SSEProvider endpoint={sseEndpoint} options={{withCredentials: false}}>
               <Comments />
