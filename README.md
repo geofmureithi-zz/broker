@@ -1,10 +1,10 @@
-## Biller - Front-end Real-time Message Bus
+## Biller - Front-end Real-time Message Broker
 
 [![crates.io](https://meritbadge.herokuapp.com/biller)](https://crates.io/crates/biller)
 
 ### Purpose
 
-The purpose of this library is to provide a real-time front-end message bus using SSE and a JSON API. 
+The purpose of this library is to provide a real-time front-end message broker using SSE and a JSON API. 
 
 Biller is born from the need that rather than building a complex REST API with web-sockets to provide reactive web forms there is a simpler way.
 
@@ -47,3 +47,14 @@ async fn main() -> std::result::Result<(), std::io::Error> {
 ### Demo
 
 - https://biller-demo.apibill.me
+
+
+### Inspiration
+
+* [React Hooks](https://reactjs.org/docs/hooks-intro.html)
+* [Meteor](https://meteor.com)
+* [MongoDB](https://www.mongodb.com/)
+* [Pusher](https://pusher.com)
+* [Event Sourcing](https://microservices.io/patterns/data/event-sourcing.html)
+* [Best in Place](https://github.com/bernat/best_in_place)
+* [Brock Whitten](https://www.youtube.com/watch?v=qljYMEfVukU)

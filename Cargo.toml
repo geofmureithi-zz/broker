@@ -1,11 +1,11 @@
 [package]
 name = "biller"
-version = "0.1.3"
+version = "0.1.4"
 authors = ["Bevan Hunt <bevan@bevanhunt.com>"]
 edition = "2018"
 license = "MIT"
-keywords = ["sse", "message-bus", "front-end", "api", "real-time"]
-description = "Front-end Real-time Message Bus"
+keywords = ["sse", "message-broker", "front-end", "api", "real-time"]
+description = "Front-end Real-time Message Broker"
 repository = "https://github.com/apibillme/biller"
 readme = "README.md"
 
