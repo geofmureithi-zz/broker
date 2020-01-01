@@ -4,7 +4,7 @@
 
 ### Purpose
 
-The purpose of this library is to be your full real-time backend server.
+The purpose of this library is to be your real-time backend server including database.
 
 Broker is born from the need that rather than building a complex REST API with web-sockets to provide reactive web forms there must be a simpler way.
 
@@ -42,6 +42,7 @@ async fn main() -> std::result::Result<(), std::io::Error> {
 
 - the only param is the origin you want to allow - wildcard for all
 - the PORT needs to passed in as an environment variable
+- the file database saves to ``` ./tmp ``` of the project root
 
 ### Endpoints
 
