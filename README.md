@@ -4,7 +4,7 @@
 
 ### Purpose
 
-The purpose of this library is to provide a SSE real-time message broker. 
+The purpose of this library is to be your full real-time backend server.
 
 Broker is born from the need that rather than building a complex REST API with web-sockets to provide reactive web forms there must be a simpler way.
 
