@@ -18,6 +18,14 @@ When the client first subscribes to the SSE connection (/events) all the latest 
 The side-effect of this system is that the latest event is the schema. Old events are saved in the database and are not changed but the latest event is the schema for the front-end. This is pure NoSQL as the backend is agnostic to the event data.
 ```
 
+### Features
+
+* Real-time Event Stream
+* Stateful immutable event persistence
+* JSON POST API to insert events 
+* Sync latest events on client connection
+* Audit log of event inserts
+
 ### Use
 
 ```rust
