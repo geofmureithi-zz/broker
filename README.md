@@ -18,7 +18,7 @@ The side-effect of this system is that the latest event is the schema. Old event
 
 ### Features
 
-* Real-time Event Stream
+* Real-time Event Stream via SSE
 * CORS support
 * Stateful immutable event persistence
 * JSON POST API to insert events 
