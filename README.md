@@ -74,7 +74,7 @@ async fn main() -> std::result::Result<(), std::io::Error> {
 
 - **Real-time events across all connected clients:** Open the demo in two browser windows watching both. Type in the name field in one and both browser windows will display the name you typed.
 
-- **Sync latest state on client connection:** Refresh one of the browsers and the name will be still be the current name and not blank.
+- **Sync latest events on client connection:** Refresh one of the browsers and the name will be still be the current name and not blank.
 
 ### Inspiration
 
