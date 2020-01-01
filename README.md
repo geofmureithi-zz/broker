@@ -1,12 +1,14 @@
-## Broker - Real-time Web Server (SSE)
+## Broker - Real-time Zero-Code API Server
 
 [![crates.io](https://meritbadge.herokuapp.com/broker)](https://crates.io/crates/broker)
 
 ### Purpose
 
-The purpose of this library is to be your real-time web server (SSE) that includes an embedded database.
+The purpose of this library is to be your real-time zero-code API server. 
 
-Broker is born from the need that rather than building a complex REST API with web-sockets to provide reactive web forms (like for React) there must be a simpler way.
+Broker is a SSE message broker that requires you write no backend code to have a full real-time API.
+
+Broker is born from the need that rather than building a complex REST API with web-sockets and a SQL database to provide reactive web forms (like for React) there must be a simpler way.
 
 Broker follows an insert-only/publish/subscribe paradigm rather than a REST CRUD paradigm. 
 
