@@ -57,8 +57,13 @@ async fn main() -> std::result::Result<(), std::io::Error> {
 
 ``` /audit/{event} ```
 - do a GET request where {event} is the name of the event you want the audit log
+- the audit log will be ``` {event}_v_{timestamp} ``` as the key with the data as a value 
 
-### Example
+### View Example
+
+- [View Example React Code](https://github.com/apibillme/broker/blob/master/example/src/App.js)
+
+### Run Example
 
 - ``` make ```
 - ``` make client ```
