@@ -79,6 +79,12 @@ async fn main() -> std::result::Result<(), std::io::Error> {
 
 - **Sync latest events on client connection:** Refresh one of the browsers and the name will be still be the current name and not blank.
 
+### Under the Hood
+
+- [actix web](https://crates.io/crates/actix-web) - web framework
+- [sled](https://crates.io/crates/sled) - embedded database
+- [sse-actix-web](https://crates.io/crates/sse-actix-web) - sse server
+
 ### Inspiration
 
 * [React Hooks](https://reactjs.org/docs/hooks-intro.html)
