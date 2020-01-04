@@ -17,6 +17,14 @@ struct MyData {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+struct Scheduled {
+    event: String,
+    timestamp: i64,
+    data: serde_json::Value,
+}
+
+
+#[derive(Debug, Serialize, Deserialize)]
 struct JSON {
     event: String,
     data: serde_json::Value,
@@ -112,6 +120,61 @@ async fn insert(data: web::Data<MyData>, broad: web::Data<Mutex<Broadcaster>>, j
     Ok(HttpResponse::Ok().json(json.0.data))
 }
 
+async fn future(data: web::Data<MyData>, broad: web::Data<Mutex<Broadcaster>>, json: web::Json<Scheduled>) -> Result<HttpResponse, Error> {
+
+    // get new value from json
+    let new_value_string = serde_json::to_string(&json.0.data).unwrap();
+    let new_value = new_value_string.as_bytes();
+
+    // write new value to prefixed epoch version (e.g. user_f_1577831518)
+    let versioned = format!("{}_f_{}", json.0.event, json.timestamp);
+    let _ = data.db.compare_and_swap(versioned.clone(), None as Option<&[u8]>, Some(new_value.clone())); 
+    let _ = web::block(move || data.db.flush()).await;
+
+    // write new event and data to sse
+    broadcast(json.0.event.clone(), serde_json::to_string(&json.0.data).unwrap(), broad.clone()).await;
+
+    // return data to json response as 200
+    Ok(HttpResponse::Ok().json(json.0.data))
+}
+
+async fn process(data: web::Data<MyData>, broad: web::Data<Mutex<Broadcaster>>) -> Result<HttpResponse, Error> {
+    
+    // get iter to loop through all keys in db
+    let data_cloned = data.db.clone();
+    let iter = data_cloned.iter();
+
+    // turn iVec(s) to String(s) and make HashMap
+    let vals : HashMap<String, Scheduled> = iter.into_iter().filter(|x| {
+        let p = x.as_ref().unwrap();
+        let k = std::str::from_utf8(&p.0).unwrap().to_owned();
+        if k.contains("_f_") {
+            return true
+        } else {
+            return false
+        }}).map(|x| {
+            let p = x.unwrap();
+            let k = std::str::from_utf8(&p.0).unwrap().to_owned();
+            let v = std::str::from_utf8(&p.1).unwrap().to_owned();
+            let json : Scheduled = serde_json::from_str(&v).unwrap();
+            (k, json)
+        }).collect();
+
+    for (k, json) in vals {
+        let now = Utc::now().timestamp();
+        if json.timestamp <= now {
+            broadcast(json.event.clone(), serde_json::to_string(&json.data).unwrap(), broad.clone()).await;
+            let data_clone = data_cloned.clone();
+            let _ = data_clone.remove(&k);
+            let _ = web::block(move || data_clone.flush()).await;
+        }
+    }
+
+    // return data to json response as 200
+    Ok(HttpResponse::Ok().json(&"{}"))
+}
+
+
 pub async fn broker_run(origin: String) -> std::result::Result<(), std::io::Error> {
     // set actix web env vars
     std::env::set_var("RUST_LOG", "actix_web=debug,actix_server=info");
@@ -124,6 +187,11 @@ pub async fn broker_run(origin: String) -> std::result::Result<(), std::io::Erro
     // setup db and sse
     let tree = sled::open("./tmp/data").unwrap();
     let data = Broadcaster::create();
+
+    // setup future key (event) in db
+    let tree_cloned = tree.clone();
+    let _ = tree_cloned.compare_and_swap(&"future", None as Option<&[u8]>, Some(b""));
+    let _ = web::block(move || tree_cloned.flush()).await;
 
     // create actix web server with CORS, data, and routes - handle wildcard origins
     if origin == "*" {
@@ -144,6 +212,8 @@ pub async fn broker_run(origin: String) -> std::result::Result<(), std::io::Erro
                 .route("/insert", web::post().to(insert))
                 .route("/events", web::get().to(new_client))
                 .route("/audit/{record}", web::get().to(audit))
+                .route("/future", web::post().to(future))
+                .route("/process", web::get().to(process))
         })
         .bind(ip).unwrap()
         .run()
@@ -166,6 +236,8 @@ pub async fn broker_run(origin: String) -> std::result::Result<(), std::io::Erro
                 .route("/insert", web::post().to(insert))
                 .route("/events", web::get().to(new_client))
                 .route("/audit/{record}", web::get().to(audit))
+                .route("/future", web::post().to(future))
+                .route("/process", web::get().to(process))
         })
         .bind(ip).unwrap()
         .run()
