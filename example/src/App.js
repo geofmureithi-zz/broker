@@ -45,7 +45,8 @@ function App() {
   const apiEndpoint = process.env.REACT_APP_API;
   const { handleSubmit, register, errors } = useForm();
   const onSubmit = values => {
-    const v = `{"event": "user", "data": {"user": "${values.user}"}}`;
+    const ts = Math.round((new Date()).getTime() / 1000);
+    const v = `{"event": "user", "published": false, "timestamp": ${ts}, "data": {"user": "${values.user}"}}`;
     fetch(apiEndpoint, {
       method: 'post',
       mode: 'cors',

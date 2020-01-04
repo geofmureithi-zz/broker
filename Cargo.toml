@@ -1,6 +1,6 @@
 [package]
 name = "broker"
-version = "0.2.8"
+version = "0.3.0"
 authors = ["Bevan Hunt <bevan@bevanhunt.com>"]
 edition = "2018"
 license = "MIT"
@@ -15,7 +15,7 @@ actix-web = "2.0.0"
 actix-cors = "0.2.0"
 futures = "0.3.1"
 tokio = "0.2.4"
-sse-actix-web = "0.7.0"
+sse-actix-web = "0.8.0"
 serde = "1.0.103"
 serde_json = "1.0.44"
 serde_derive = "1.0.103"
@@ -24,3 +24,4 @@ sled = "0.30.3"
 envy = "0.4.0"
 env_logger = "0.6"
 chrono = { version = "0.4.10", features = ["serde"] }
+uuid = { version = "0.8.1", features = ["serde", "v4"] }

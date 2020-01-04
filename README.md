@@ -12,24 +12,44 @@ Broker is born from the need that rather than building a complex REST API with w
 
 Broker follows an insert-only/publish/subscribe paradigm rather than a REST CRUD paradigm. 
 
+
 ### How it works
 
-In Broker you insert an event and its data via a JSON POST request (/insert). Broker publishes the latest event to an event stream via SSE (/events) and keeps all versions in its database that can be viewed in a JSON GET request (/audit/{event}).
+In Broker you insert a current event and its data via a JSON POST request (/insert) with a timestamp. Broker publishes the event when the timestamp is reached to the event stream via SSE (/events). Broker keeps all versions in its database that can be viewed in a JSON GET request (/collection/{event}). 
 
 When the client first subscribes to the SSE connection (/events) all the latest events and data is sent to the client. Combined with sending the latest event via SSE when subscribed negates the necessity to do any GET API requests in the lifecycle of an event.
 
 The side-effect of this system is that the latest event is the schema. Old events are saved in the database and are not changed but the latest event is the schema for the front-end. This is pure NoSQL as the backend is agnostic to the event data.
 
+
+#### API
+
+``` /events ```
+- connect your sse-client to this endpoint
+
+```/insert ```
+- POST JSON to insert an event
+```json
+{"event":{...}, "published": false, "timestamp":{...}, "data":{...}}
+```
+- where {...} is for the event a string, timestamp is the epoch unix timestamp when you want the event to become the current event, and data is any JSON you want
+
+#### Collection
+
+``` /collection/{event} ```
+- do a GET request where {event} is the name of the event you want the audit log
+
 ### Features
 
+* Very performant with a low memory footprint
 * Real-time Event Stream via SSE
 * CORS support
 * Handles SSE client timeouts
+* Handles future events
 * Stateful immutable event persistence
 * JSON POST API to insert events 
 * Sync latest events on SSE client connection
-* Audit log of events
-* Very performant with low memory footprint
+* Event log via GET request
 
 ### Use
 
@@ -46,21 +66,6 @@ async fn main() -> std::result::Result<(), std::io::Error> {
 - the PORT needs to passed in as an environment variable
 - the file database saves to ``` ./tmp ``` of the project root
 
-### Endpoints
-
-``` /events ```
-- connect your sse-client to this endpoint
-
-```/insert ```
-- POST JSON to insert an event
-```json
-{"event":{...}, "data":{...}}
-```
-- where {...} is for the event a string and data is any JSON you want
-
-``` /audit/{event} ```
-- do a GET request where {event} is the name of the event you want the audit log
-- the audit log will be ``` {event}_v_{timestamp} ``` as the key with the data as a value 
 
 ### View Example
 
@@ -81,7 +86,7 @@ async fn main() -> std::result::Result<(), std::io::Error> {
 
 ### Under the Hood
 
-- [actix web](https://crates.io/crates/actix-web) - web framework
+- [actix-web](https://crates.io/crates/actix-web) - web framework
 - [sled](https://crates.io/crates/sled) - embedded database
 - [sse-actix-web](https://crates.io/crates/sse-actix-web) - sse server
 
