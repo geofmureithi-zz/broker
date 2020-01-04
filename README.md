@@ -34,10 +34,11 @@ The side-effect of this system is that the latest event is the schema. Old event
 ```
 - where {...} is for the event a string, timestamp is the epoch unix timestamp when you want the event to become the current event, and data is any JSON you want
 
-#### Collection
-
 ``` /collection/{event} ```
-- do a GET request where {event} is the name of the event you want the audit log
+- do a GET request where {event} is the name of the event you want the list of events
+
+``` /cancel/{uuid} ```
+- do a GET request where (uuid) is the event uuid you want to cancel - this will mark the event published when it will not be published to the event stream - the event uuid can be obtained from the response from /insert or from /collection/{event}.
 
 ### Features
 

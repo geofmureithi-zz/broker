@@ -7,6 +7,7 @@ use actix_cors::Cors;
 use std::collections::HashMap;
 use chrono::prelude::*;
 use uuid::Uuid;
+use serde_json::json;
 
 #[derive(Deserialize, Debug)]
 struct Config {
@@ -97,8 +98,23 @@ async fn insert(data: web::Data<MyData>, json: web::Json<JSON>) -> Result<HttpRe
     let _ = data.db.compare_and_swap(versioned.clone(), None as Option<&[u8]>, Some(new_value.clone())); 
     let _ = web::block(move || data.db.flush()).await;
 
-    // return data to json response as 200
-    Ok(HttpResponse::Ok().json(json.0.data))
+    // return uuid to json response as 200
+    let record = json!({ "uuid": versioned });
+    Ok(HttpResponse::Ok().json(record))
+}
+
+async fn cancel(data: web::Data<MyData>, path: web::Path<Path>) -> Result<HttpResponse, Error> {
+
+    let p = &path.record;
+    let g = data.db.get(&p.as_bytes()).unwrap().unwrap();
+    let v = std::str::from_utf8(&g).unwrap().to_owned();
+    let mut json : JSON = serde_json::from_str(&v).unwrap();
+    let j = json.clone();
+    json.published = true;
+    let _ = data.db.compare_and_swap(p.as_bytes(), Some(serde_json::to_string(&j).unwrap().as_bytes()), Some(serde_json::to_string(&json).unwrap().as_bytes()));
+    let _ = web::block(move || { data.db.flush() }).await;
+    Ok(HttpResponse::Ok().json(json))
+
 }
 
 pub async fn broker_run(origin: String) -> std::result::Result<(), std::io::Error> {
@@ -174,6 +190,7 @@ pub async fn broker_run(origin: String) -> std::result::Result<(), std::io::Erro
                 .route("/insert", web::post().to(insert))
                 .route("/events", web::get().to(new_client))
                 .route("/collection/{record}", web::get().to(collection))
+                .route("/cancel/{record}", web::get().to(cancel))
         })
         .bind(ip).unwrap()
         .run()
@@ -196,6 +213,7 @@ pub async fn broker_run(origin: String) -> std::result::Result<(), std::io::Erro
                 .route("/insert", web::post().to(insert))
                 .route("/events", web::get().to(new_client))
                 .route("/collection/{record}", web::get().to(collection))
+                .route("/cancel/{record}", web::get().to(cancel))
         })
         .bind(ip).unwrap()
         .run()
