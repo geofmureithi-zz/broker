@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use chrono::prelude::*;
 use uuid::Uuid;
 use serde_json::json;
+use bcrypt::{DEFAULT_COST, hash, verify};
 
 #[derive(Deserialize, Debug)]
 struct Config {
@@ -16,6 +17,19 @@ struct Config {
 
 struct MyData {
     db: sled::Db
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct Users {
+    data: Vec<User>
+}
+
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct User {
+    username: String,
+    password: String,
+    info: serde_json::Value,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -114,7 +128,36 @@ async fn cancel(data: web::Data<MyData>, path: web::Path<Path>) -> Result<HttpRe
     let _ = data.db.compare_and_swap(p.as_bytes(), Some(serde_json::to_string(&j).unwrap().as_bytes()), Some(serde_json::to_string(&json).unwrap().as_bytes()));
     let _ = web::block(move || { data.db.flush() }).await;
     Ok(HttpResponse::Ok().json(json))
+}
 
+async fn user_create(data: web::Data<MyData>, json: web::Json<User>) -> Result<HttpResponse, Error> {
+
+    let data_cloned = data.clone();
+    let _ = data.db.compare_and_swap(b"users", None as Option<&[u8]>, Some(b"{\"data\": []}")); 
+    let _ = web::block(move || { data.db.flush() }).await;
+
+    let p = data_cloned.db.get("users").unwrap().unwrap();
+    let v = std::str::from_utf8(&p).unwrap().to_owned();
+    let users : Users = serde_json::from_str(&v).unwrap();
+    let mut users_clone = users.clone();
+
+    // check if unique
+    let mut uniq = true;
+    for user in users.data {
+        if user.username == json.username {
+            uniq = false;
+        } 
+    }
+
+    // if unique - hash password and save in db
+    if uniq {
+        let hashed = hash(json.clone().password, DEFAULT_COST).unwrap();
+        let new_user = User{username: json.clone().username, password: hashed, info: json.clone().info};
+        let new_users = users_clone.data.push(new_user);
+        let _ = data_cloned.db.compare_and_swap(b"users", Some(serde_json::to_string(&users_clone).unwrap().as_bytes()), Some(serde_json::to_string(&new_users).unwrap().as_bytes())); 
+    }
+
+    Ok(HttpResponse::Ok().json(""))
 }
 
 pub async fn broker_run(origin: String) -> std::result::Result<(), std::io::Error> {
@@ -191,6 +234,7 @@ pub async fn broker_run(origin: String) -> std::result::Result<(), std::io::Erro
                 .route("/events", web::get().to(new_client))
                 .route("/collection/{record}", web::get().to(collection))
                 .route("/cancel/{record}", web::get().to(cancel))
+                .route("/users/", web::post().to(user_create))
         })
         .bind(ip).unwrap()
         .run()
@@ -214,6 +258,7 @@ pub async fn broker_run(origin: String) -> std::result::Result<(), std::io::Erro
                 .route("/events", web::get().to(new_client))
                 .route("/collection/{record}", web::get().to(collection))
                 .route("/cancel/{record}", web::get().to(cancel))
+                .route("/users/", web::post().to(user_create))
         })
         .bind(ip).unwrap()
         .run()
