@@ -43,7 +43,6 @@ struct Login {
 struct User {
     username: String,
     password: String,
-    subscriptions: Vec<String>,
     info: serde_json::Value,
 }
 
@@ -273,7 +272,7 @@ async fn user_create(data: web::Data<MyData>, json: web::Json<User>) -> Result<H
         let uuid = Uuid::new_v4();
         let versioned = format!("{}_u_{}", json.username, uuid.to_string());
         let hashed = hash(json.clone().password, DEFAULT_COST).unwrap();
-        let new_user = User{username: json.clone().username, password: hashed, info: json.clone().info, subscriptions: Vec::new()};
+        let new_user = User{username: json.clone().username, password: hashed, info: json.clone().info};
         
         let _ = data.db.compare_and_swap(versioned.as_bytes(), None as Option<&[u8]>, Some(serde_json::to_string(&new_user).unwrap().as_bytes())); 
         let _ = web::block(move || { data.db.flush() }).await;
