@@ -77,14 +77,16 @@ async fn collection(data: web::Data<MyData>, path: web::Path<Path>, req: HttpReq
             for part in parts {
                 if part != "Bearer" {
                     let _ = match decode::<Claims>(&part, secret.as_ref(), &Validation::default()) {
-                        Ok(c) => c,
+                        Ok(c) => {
+                            check = check + 1;
+                            c
+                        },
                         Err(err) => match *err.kind() {
                             _ => return Ok(HttpResponse::Unauthorized().json(""))
                         },
                     };
                 }
             }
-            check = check + 1;
         } 
     }
 
@@ -167,14 +169,16 @@ async fn insert(data: web::Data<MyData>, json: web::Json<JSON>, req: HttpRequest
             for part in parts {
                 if part != "Bearer" {
                     let _ = match decode::<Claims>(&part, secret.as_ref(), &Validation::default()) {
-                        Ok(c) => c,
+                        Ok(c) => {
+                            check = check + 1;
+                            c
+                        },
                         Err(err) => match *err.kind() {
                             _ => return Ok(HttpResponse::Unauthorized().json(""))
                         },
                     };
                 }
             }
-            check = check + 1;
         } 
     }
 
@@ -214,17 +218,19 @@ async fn cancel(data: web::Data<MyData>, path: web::Path<Path>, req: HttpRequest
             for part in parts {
                 if part != "Bearer" {
                     let _ = match decode::<Claims>(&part, secret.as_ref(), &Validation::default()) {
-                        Ok(c) => c,
+                        Ok(c) => {
+                            check = check + 1;
+                            c
+                        },
                         Err(err) => match *err.kind() {
                             _ => return Ok(HttpResponse::Unauthorized().json(""))
                         },
                     };
                 }
             }
-            check = check + 1;
         } 
     }
-
+    
     // if no auth header
     if check == 0 {
         return Ok(HttpResponse::Unauthorized().json(""))
