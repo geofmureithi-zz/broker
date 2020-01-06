@@ -65,7 +65,9 @@ async fn main() -> std::result::Result<(), std::io::Error> {
 ```
 
 - the only param is the origin you want to allow - wildcard is not supported
-- the PORT needs to passed in as an environment variable
+- the PORT needs to be passed in as an environment variable
+- the ORIGIN needs to be passed in as an environment variable
+- the EXPIRY (for jwts) needs to be passed in as an environment variable
 - the file database saves to ``` ./tmp ``` of the project root
 
 

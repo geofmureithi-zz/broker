@@ -9,11 +9,13 @@ use chrono::prelude::*;
 use uuid::Uuid;
 use serde_json::json;
 use bcrypt::{DEFAULT_COST, hash, verify};
+use jsonwebtoken::{encode, Header};
 
 #[derive(Deserialize, Debug)]
 pub struct Config {
   port: String,
-  pub origin: String
+  pub origin: String,
+  pub expiry: usize,
 }
 
 struct MyData {
@@ -25,6 +27,11 @@ struct Users {
     data: Vec<User>
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct Login {
+    username: String,
+    password: String,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct User {
@@ -44,6 +51,13 @@ struct JSON {
 #[derive(Debug, Serialize, Deserialize)]
 struct Path {
     record: String
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Claims {
+    sub: String,
+    company: String,
+    exp: usize,
 }
 
 async fn collection(data: web::Data<MyData>, path: web::Path<Path>) -> Result<HttpResponse, Error> {
@@ -169,6 +183,28 @@ async fn user_create(data: web::Data<MyData>, json: web::Json<User>) -> Result<H
     Ok(HttpResponse::Ok().json(""))
 }
 
+async fn login(data: web::Data<MyData>, json: web::Json<Login>) -> Result<HttpResponse, Error> {
+
+    // get origin env var
+    let config = envy::from_env::<Config>().unwrap();
+    let expiry = config.expiry;
+
+    let p = data.db.get("users").unwrap().unwrap();
+    let v = std::str::from_utf8(&p).unwrap().to_owned();
+    let users : Users = serde_json::from_str(&v).unwrap();
+
+    let mut token = "".to_owned();
+
+    for user in users.data {
+        if user.username == json.username && verify(json.clone().password, &user.password).unwrap() {
+            let my_claims = Claims{company: "".to_owned(), sub: user.username, exp: expiry};
+            token = encode(&Header::default(), &my_claims, "secret".as_ref()).unwrap();
+        }
+    }
+
+    Ok(HttpResponse::Ok().json(token))
+}
+
 pub async fn broker_run(origin: String) -> std::result::Result<(), std::io::Error> {
     // set actix web env vars
     std::env::set_var("RUST_LOG", "actix_web=debug,actix_server=info");
@@ -241,7 +277,8 @@ pub async fn broker_run(origin: String) -> std::result::Result<(), std::io::Erro
             .route("/events", web::get().to(new_client))
             .route("/collection/{record}", web::get().to(collection))
             .route("/cancel/{record}", web::get().to(cancel))
-            .route("/users/", web::post().to(user_create))
+            .route("/users", web::post().to(user_create))
+            .route("/login", web::post().to(login))
     })
     .bind(ip).unwrap()
     .run()
