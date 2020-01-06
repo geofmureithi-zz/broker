@@ -67,7 +67,7 @@ function App() {
        <CardContent>
         <Typography className={classes.title} color="textSecondary" gutterBottom component={'span'} variant={'body2'}>
           What is your name?&nbsp;
-            <SSEProvider endpoint={sseEndpoint} options={{withCredentials: true}}>
+            <SSEProvider endpoint={sseEndpoint} options={{withCredentials: false}}>
               <Comments />
             </SSEProvider>
           </Typography>
