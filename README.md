@@ -15,7 +15,7 @@ Broker follows an insert-only/publish/subscribe paradigm rather than a REST CRUD
 
 ### How it works
 
-In Broker you insert an event and its data via a JSON POST request (/insert) with a timestamp. Broker publishes the event when the timestamp is reached to the event stream via SSE (/events). Broker keeps all versions in its database that can be viewed in a GET request (/collection/{event}). Broker can also cancel future events in a GET request (cancel/{uuid}).
+In Broker you insert an event and its data via a JSON POST request (/insert) with a timestamp. Broker publishes the event when the timestamp is reached to the event stream via SSE (/events). Broker keeps all versions in its database that can be viewed in a GET request (/collections/{event}). Broker can also cancel future events in a GET request (cancel/{uuid}).
 
 When the client first subscribes to the SSE connection (/events) all the latest events and data is sent to the client. Combined with sending the latest event via SSE when subscribed negates the necessity to do any GET API requests in the lifecycle of an event.
 
@@ -34,7 +34,7 @@ The side-effect of this system is that the latest event is the schema. Old event
 ```
 - where {...} is for the event a string, timestamp is the epoch unix timestamp when you want the event to become the current event, and data is any JSON you want
 
-``` /collection/{event} ```
+``` /collections/{event} ```
 - do a GET request where {event} is the name of the event you want the event log
 
 ``` /cancel/{uuid} ```

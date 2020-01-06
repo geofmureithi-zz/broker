@@ -1,5 +1,5 @@
 build:
-	PORT=8080 ORIGIN=http://localhost:3000 cargo run
+	PORT=8080 ORIGIN=http://localhost:3000 EXPIRY=3600 cargo run
 rusty:
 	curl -S -v --header "Content-Type: application/json" POST --data '{"event":"user", "data":{"user":"Rusty"}}'  http://localhost:8080/insert
 client:
