@@ -11,8 +11,9 @@ use serde_json::json;
 use bcrypt::{DEFAULT_COST, hash, verify};
 
 #[derive(Deserialize, Debug)]
-struct Config {
-  port: String
+pub struct Config {
+  port: String,
+  pub origin: String
 }
 
 struct MyData {
@@ -95,7 +96,10 @@ async fn new_client(data: web::Data<MyData>, broad: web::Data<Mutex<Broadcaster>
 
     // create sse endpoint
     HttpResponse::Ok()
-        .header("content-type", "text/event-stream")
+        .header("Set-Cookie", "SameSite=Strict")
+        .header("Keep-Alive", "true")
+        .header("Access-Control-Allow-Credentials", "true")
+        .header("Content-Type", "text/event-stream")
         .no_chunking()
         .streaming(rx)
 }
@@ -214,54 +218,27 @@ pub async fn broker_run(origin: String) -> std::result::Result<(), std::io::Erro
     });
     x.thread();
 
-    // create actix web server with CORS, data, and routes - handle wildcard origins
-    if origin == "*" {
-        HttpServer::new(move || {
-            App::new()
-                .wrap(middleware::Logger::default())
-                .wrap(
-                    Cors::new()
-                        .send_wildcard()
-                        .allowed_methods(vec!["GET", "POST"])
-                        .allowed_headers(vec![header::AUTHORIZATION, header::ACCEPT, header::CONTENT_TYPE])
-                        .max_age(3600)
-                        .finish()
-                )
-                .app_data(events.clone())
-                .app_data(web::JsonConfig::default())
-                .data(MyData{ db: tree.clone() })
-                .route("/insert", web::post().to(insert))
-                .route("/events", web::get().to(new_client))
-                .route("/collection/{record}", web::get().to(collection))
-                .route("/cancel/{record}", web::get().to(cancel))
-                .route("/users/", web::post().to(user_create))
-        })
-        .bind(ip).unwrap()
-        .run()
-        .await
-    } else {
-        HttpServer::new(move || {
-            App::new()
-                .wrap(middleware::Logger::default())
-                .wrap(
-                    Cors::new()
-                        .allowed_origin(&origin)
-                        .allowed_methods(vec!["GET", "POST"])
-                        .allowed_headers(vec![header::AUTHORIZATION, header::ACCEPT, header::CONTENT_TYPE])
-                        .max_age(3600)
-                        .finish()
-                )
-                .app_data(events.clone())
-                .app_data(web::JsonConfig::default())
-                .data(MyData{ db: tree.clone() })
-                .route("/insert", web::post().to(insert))
-                .route("/events", web::get().to(new_client))
-                .route("/collection/{record}", web::get().to(collection))
-                .route("/cancel/{record}", web::get().to(cancel))
-                .route("/users/", web::post().to(user_create))
-        })
-        .bind(ip).unwrap()
-        .run()
-        .await
-    }
+    HttpServer::new(move || {
+        App::new()
+            .wrap(middleware::Logger::default())
+            .wrap(
+                Cors::new()
+                    .allowed_origin(&origin)
+                    .allowed_methods(vec!["GET", "POST"])
+                    .allowed_headers(vec![header::AUTHORIZATION, header::ACCEPT, header::CONTENT_TYPE])
+                    .max_age(3600)
+                    .finish()
+            )
+            .app_data(events.clone())
+            .app_data(web::JsonConfig::default())
+            .data(MyData{ db: tree.clone() })
+            .route("/insert", web::post().to(insert))
+            .route("/events", web::get().to(new_client))
+            .route("/collection/{record}", web::get().to(collection))
+            .route("/cancel/{record}", web::get().to(cancel))
+            .route("/users/", web::post().to(user_create))
+    })
+    .bind(ip).unwrap()
+    .run()
+    .await
 }

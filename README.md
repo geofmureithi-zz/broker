@@ -60,11 +60,11 @@ use broker::{broker_run};
 
 #[actix_rt::main]
 async fn main() -> std::result::Result<(), std::io::Error> {
-    broker_run("*".to_owned()).await
+    broker_run("http://localhost:3000".to_owned()).await
 }
 ```
 
-- the only param is the origin you want to allow - wildcard for all
+- the only param is the origin you want to allow - wildcard is not supported
 - the PORT needs to passed in as an environment variable
 - the file database saves to ``` ./tmp ``` of the project root
 
