@@ -74,6 +74,10 @@ async fn collection(data: web::Data<MyData>, path: web::Path<Path>) -> Result<Ht
 
 async fn new_client(data: web::Data<MyData>, broad: web::Data<Mutex<Broadcaster>>) -> impl Responder {
 
+    // get origin env var
+    let config = envy::from_env::<Config>().unwrap();
+    let origin = config.origin;
+
     // turn iVec(s) to String(s) and make HashMap
     let vals: HashMap<String, String> = data.db.iter().into_iter().filter(|x| {
         let p = x.as_ref().unwrap();
@@ -96,6 +100,7 @@ async fn new_client(data: web::Data<MyData>, broad: web::Data<Mutex<Broadcaster>
 
     // create sse endpoint
     HttpResponse::Ok()
+        .header("Access-Control-Allow-Origin", origin)
         .header("Set-Cookie", "SameSite=Strict")
         .header("Keep-Alive", "true")
         .header("Access-Control-Allow-Credentials", "true")
