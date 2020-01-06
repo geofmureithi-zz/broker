@@ -15,29 +15,49 @@ Broker follows an insert-only/publish/subscribe paradigm rather than a REST CRUD
 
 ### How it works
 
-In Broker you insert an event and its data via a JSON POST request (/insert) with a timestamp. Broker publishes the event when the timestamp is reached to the event stream via SSE (/events). Broker keeps all versions in its database that can be viewed in a GET request (/collections/{event}). Broker can also cancel future events in a GET request (cancel/{uuid}).
+In Broker you create a user, login, then insert an event and its data with a timestamp. Broker publishes the event when the timestamp is reached to the event stream via SSE. Broker keeps all event versions in its database that can be viewed. Broker can also cancel future events.
 
-When the client first subscribes to the SSE connection (/events) all the latest events and data is sent to the client. Combined with sending the latest event via SSE when subscribed negates the necessity to do any GET API requests in the lifecycle of an event.
+When the client first subscribes to the SSE connection all the latest events and data is sent to the client. Combined with sending the latest event via SSE when subscribed negates the necessity to do any GET API requests in the lifecycle of an event.
 
 The side-effect of this system is that the latest event is the schema. Old events are saved in the database and are not changed but the latest event is the schema for the front-end. This is pure NoSQL as the backend is agnostic to the event data.
 
 
 #### API
 
-``` /events ```
+``` /users ```
+- POST JSON to create a user
+```json
+{"username":{...}, "password":{...}, "info":{...}}
+```
+- where {...} is for username and string, password a string, and info any JSON you want
+
+``` /login ```
+- POST JSON to login
+```json
+{"username":{...}, "password":{...}}
+```
+- where {...} is for username a string and password a string
+
+will return 
+```json
+{"jwt":{...}}
+```
+- where {...} is a JWT (string)
+
+``` /events ``` (public)
 - connect your sse-client to this endpoint
 
-```/insert ```
+```/insert ``` (requires authenicatation)
 - POST JSON to insert an event
 ```json
 {"event":{...}, "published": false, "timestamp":{...}, "data":{...}}
 ```
 - where {...} is for the event a string, timestamp is the epoch unix timestamp when you want the event to become the current event, and data is any JSON you want
 
-``` /collections/{event} ```
+``` /collections/{event} ``` (requires authenicatation)
 - do a GET request where {event} is the name of the event you want the event log
 
-``` /cancel/{uuid} ```
+``` /cancel/{uuid} ``` (requires authenicatation)
 - do a GET request where (uuid) is the event uuid you want to cancel - this will mark the event published and it will not be published to the event stream - the event uuid can be obtained from the response from /insert or from /collection/{event}.
 
 ### Features
@@ -46,6 +66,7 @@ The side-effect of this system is that the latest event is the schema. Old event
 * Real-time Event Stream via SSE
 * CORS support
 * Handles SSE client timeouts
+* Provides user authentication with JWTs and Bcrypt(ed) passwords
 * Handles future events via Epoch UNIX timestamp
 * Stateful immutable event persistence
 * Insert event via JSON POST request 
@@ -71,23 +92,9 @@ async fn main() -> std::result::Result<(), std::io::Error> {
 - the SECRET (for jwts) needs to be passed in as an environment variable
 - the file database saves to ``` ./tmp ``` of the project root
 
-
-### View Example
-
-- [View Example React Code](https://github.com/apibillme/broker/blob/master/example/src/App.js)
-
 ### Run Example
 
 - ``` make ```
-- ``` make client ```
-
-### Demo
-
-- https://broker-demo.apibill.me
-
-- **Real-time events across all connected clients:** Open the demo in two browser windows watching both. Type in the name field in one and both browser windows will display the name you typed.
-
-- **Sync latest events on client connection:** Refresh one of the browsers and the name will be still be the current name and not blank.
 
 ### Under the Hood
 

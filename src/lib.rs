@@ -25,12 +25,7 @@ struct MyData {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct Token {
-    data: String
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-struct Users {
-    data: Vec<User>
+    jwt: String
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -315,7 +310,7 @@ async fn login(data: web::Data<MyData>, json: web::Json<Login>) -> Result<HttpRe
         if user.username == json.username && verify(json.clone().password, &user.password).unwrap() {
             let my_claims = Claims{company: "".to_owned(), sub: user.username, exp: expiry};
             let token = encode(&Header::default(), &my_claims, secret.as_ref()).unwrap();
-            return Ok(HttpResponse::Ok().json(Token{data: token}))
+            return Ok(HttpResponse::Ok().json(Token{jwt: token}))
         } else {
             return Ok(HttpResponse::Unauthorized().json(""))
         }
