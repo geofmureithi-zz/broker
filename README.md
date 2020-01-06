@@ -24,14 +24,20 @@ The side-effect of this system is that the latest event is the schema. Old event
 
 #### API
 
-``` /users ```
+```html
+/users 
+```
+- public endpoint
 - POST JSON to create a user
 ```json
 {"username":{...}, "password":{...}, "info":{...}}
 ```
 - where {...} is for username and string, password a string, and info any JSON you want
 
-``` /login ```
+```html
+/login 
+```
+- public endpoint
 - POST JSON to login
 ```json
 {"username":{...}, "password":{...}}
@@ -44,20 +50,38 @@ will return
 ```
 - where {...} is a JWT (string)
 
-``` /events ``` (public)
+```html 
+/events 
+```
+- public endpoint
 - connect your sse-client to this endpoint
 
-```/insert ``` (requires authenicatation)
+```html
+/insert 
+```
+- authenticated endpoint
 - POST JSON to insert an event
 ```json
 {"event":{...}, "published": false, "timestamp":{...}, "data":{...}}
 ```
 - where {...} is for the event a string, timestamp is the epoch unix timestamp when you want the event to become the current event, and data is any JSON you want
 
-``` /collections/{event} ``` (requires authenicatation)
+will return
+```json
+{"uuid":{...}}
+```
+- where {...} is a string
+
+```html
+/collections/{event}
+```
+- authenticated endpoint
 - do a GET request where {event} is the name of the event you want the event log
 
-``` /cancel/{uuid} ``` (requires authenicatation)
+```html
+/cancel/{uuid}
+``` 
+- authenticated endpoint
 - do a GET request where (uuid) is the event uuid you want to cancel - this will mark the event published and it will not be published to the event stream - the event uuid can be obtained from the response from /insert or from /collection/{event}.
 
 ### Features
