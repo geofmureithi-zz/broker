@@ -1,4 +1,4 @@
-use actix_web::{http::header, middleware, web, HttpServer, HttpResponse, App, Error, Responder};
+use actix_web::{http::header, middleware, web, HttpServer, HttpResponse, HttpRequest, App, Error, Responder};
 use sse_actix_web::{Broadcaster, broadcast};
 use serde_derive::{Deserialize, Serialize};
 use std::sync::Mutex;
@@ -9,13 +9,14 @@ use chrono::prelude::*;
 use uuid::Uuid;
 use serde_json::json;
 use bcrypt::{DEFAULT_COST, hash, verify};
-use jsonwebtoken::{encode, Header};
+use jsonwebtoken::{encode, decode, Header, Validation};
 
 #[derive(Deserialize, Debug)]
 pub struct Config {
   port: String,
   pub origin: String,
-  pub expiry: usize,
+  expiry: i64,
+  secret: String,
 }
 
 struct MyData {
@@ -42,6 +43,7 @@ struct Login {
 struct User {
     username: String,
     password: String,
+    subscriptions: Vec<String>,
     info: serde_json::Value,
 }
 
@@ -65,7 +67,37 @@ struct Claims {
     exp: usize,
 }
 
-async fn collection(data: web::Data<MyData>, path: web::Path<Path>) -> Result<HttpResponse, Error> {
+async fn collection(data: web::Data<MyData>, path: web::Path<Path>, req: HttpRequest) -> Result<HttpResponse, Error> {
+
+    // get origin env var
+    let config = envy::from_env::<Config>().unwrap();
+    let secret = config.secret;
+
+    // verify jwt
+    let headers = req.headers();
+    let mut check : i32 = 0;
+    for (k, v) in headers {
+        if k == "Authorization" {
+            let token = v.to_str().unwrap().to_owned();
+            let parts = token.split(" ");
+            for part in parts {
+                if part != "Bearer" {
+                    let _ = match decode::<Claims>(&part, secret.as_ref(), &Validation::default()) {
+                        Ok(c) => c,
+                        Err(err) => match *err.kind() {
+                            _ => return Ok(HttpResponse::Unauthorized().json(""))
+                        },
+                    };
+                }
+            }
+            check = check + 1;
+        } 
+    }
+
+    // if no auth header
+    if check == 0 {
+        return Ok(HttpResponse::Unauthorized().json(""))
+    }
 
     // turn iVec(s) to String(s) and make HashMap
     let records: HashMap<String, serde_json::value::Value> = data.db.iter().into_iter().filter(|x| {
@@ -125,7 +157,37 @@ async fn new_client(data: web::Data<MyData>, broad: web::Data<Mutex<Broadcaster>
         .streaming(rx)
 }
 
-async fn insert(data: web::Data<MyData>, json: web::Json<JSON>) -> Result<HttpResponse, Error> {
+async fn insert(data: web::Data<MyData>, json: web::Json<JSON>, req: HttpRequest) -> Result<HttpResponse, Error> {
+
+    // get origin env var
+    let config = envy::from_env::<Config>().unwrap();
+    let secret = config.secret;
+
+    // verify jwt
+    let headers = req.headers();
+    let mut check : i32 = 0;
+    for (k, v) in headers {
+        if k == "Authorization" {
+            let token = v.to_str().unwrap().to_owned();
+            let parts = token.split(" ");
+            for part in parts {
+                if part != "Bearer" {
+                    let _ = match decode::<Claims>(&part, secret.as_ref(), &Validation::default()) {
+                        Ok(c) => c,
+                        Err(err) => match *err.kind() {
+                            _ => return Ok(HttpResponse::Unauthorized().json(""))
+                        },
+                    };
+                }
+            }
+            check = check + 1;
+        } 
+    }
+
+    // if no auth header
+    if check == 0 {
+        return Ok(HttpResponse::Unauthorized().json(""))
+    }
 
     // get new value from json
     let new_value_string = serde_json::to_string(&json.0).unwrap();
@@ -142,7 +204,37 @@ async fn insert(data: web::Data<MyData>, json: web::Json<JSON>) -> Result<HttpRe
     Ok(HttpResponse::Ok().json(record))
 }
 
-async fn cancel(data: web::Data<MyData>, path: web::Path<Path>) -> Result<HttpResponse, Error> {
+async fn cancel(data: web::Data<MyData>, path: web::Path<Path>, req: HttpRequest) -> Result<HttpResponse, Error> {
+
+    // get origin env var
+    let config = envy::from_env::<Config>().unwrap();
+    let secret = config.secret;
+
+    // verify jwt
+    let headers = req.headers();
+    let mut check : i32 = 0;
+    for (k, v) in headers {
+        if k == "Authorization" {
+            let token = v.to_str().unwrap().to_owned();
+            let parts = token.split(" ");
+            for part in parts {
+                if part != "Bearer" {
+                    let _ = match decode::<Claims>(&part, secret.as_ref(), &Validation::default()) {
+                        Ok(c) => c,
+                        Err(err) => match *err.kind() {
+                            _ => return Ok(HttpResponse::Unauthorized().json(""))
+                        },
+                    };
+                }
+            }
+            check = check + 1;
+        } 
+    }
+
+    // if no auth header
+    if check == 0 {
+        return Ok(HttpResponse::Unauthorized().json(""))
+    }
 
     let p = &path.record;
     let g = data.db.get(&p.as_bytes()).unwrap().unwrap();
@@ -181,7 +273,7 @@ async fn user_create(data: web::Data<MyData>, json: web::Json<User>) -> Result<H
         let uuid = Uuid::new_v4();
         let versioned = format!("{}_u_{}", json.username, uuid.to_string());
         let hashed = hash(json.clone().password, DEFAULT_COST).unwrap();
-        let new_user = User{username: json.clone().username, password: hashed, info: json.clone().info};
+        let new_user = User{username: json.clone().username, password: hashed, info: json.clone().info, subscriptions: Vec::new()};
         
         let _ = data.db.compare_and_swap(versioned.as_bytes(), None as Option<&[u8]>, Some(serde_json::to_string(&new_user).unwrap().as_bytes())); 
         let _ = web::block(move || { data.db.flush() }).await;
@@ -193,7 +285,14 @@ async fn login(data: web::Data<MyData>, json: web::Json<Login>) -> Result<HttpRe
 
     // get origin env var
     let config = envy::from_env::<Config>().unwrap();
-    let expiry = config.expiry;
+    let exp = config.expiry;
+    let secret = config.secret;
+
+
+    // add timestamp
+    let now = Utc::now().timestamp();
+    let expi = now + exp;
+    let expiry = expi as usize;
 
     // turn iVec(s) to String(s) and make HashMap
     let records : HashMap<String, String> = data.db.iter().into_iter().filter(|x| {
@@ -216,7 +315,7 @@ async fn login(data: web::Data<MyData>, json: web::Json<Login>) -> Result<HttpRe
         let user : User = serde_json::from_str(&v).unwrap();
         if user.username == json.username && verify(json.clone().password, &user.password).unwrap() {
             let my_claims = Claims{company: "".to_owned(), sub: user.username, exp: expiry};
-            let token = encode(&Header::default(), &my_claims, "secret".as_ref()).unwrap();
+            let token = encode(&Header::default(), &my_claims, secret.as_ref()).unwrap();
             return Ok(HttpResponse::Ok().json(Token{data: token}))
         } else {
             return Ok(HttpResponse::Unauthorized().json(""))

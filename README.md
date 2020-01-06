@@ -68,6 +68,7 @@ async fn main() -> std::result::Result<(), std::io::Error> {
 - the PORT needs to be passed in as an environment variable
 - the ORIGIN needs to be passed in as an environment variable
 - the EXPIRY (for jwts) needs to be passed in as an environment variable
+- the SECRET (for jwts) needs to be passed in as an environment variable
 - the file database saves to ``` ./tmp ``` of the project root
 
 
