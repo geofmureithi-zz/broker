@@ -195,15 +195,31 @@ async fn login(data: web::Data<MyData>, json: web::Json<Login>) -> Result<HttpRe
     let config = envy::from_env::<Config>().unwrap();
     let expiry = config.expiry;
 
-    let p = data.db.get("users").unwrap().unwrap();
-    let v = std::str::from_utf8(&p).unwrap().to_owned();
-    let users : Users = serde_json::from_str(&v).unwrap();
+    // turn iVec(s) to String(s) and make HashMap
+    let records : HashMap<String, String> = data.db.iter().into_iter().filter(|x| {
+        let p = x.as_ref().unwrap();
+        let k = std::str::from_utf8(&p.0).unwrap().to_owned();
+        let search = format!("{}_u_", json.username);
+        if k.contains(&search) {
+            return true;
+        } else {
+            return false;
+        }
+    }).map(|x| {
+        let p = x.unwrap();
+        let k = std::str::from_utf8(&p.0).unwrap().to_owned();
+        let v = std::str::from_utf8(&p.1).unwrap().to_owned();
+        (k, v)
+    }).collect();
 
-    for user in users.data {
+    for (_k, v) in records {
+        let user : User = serde_json::from_str(&v).unwrap();
         if user.username == json.username && verify(json.clone().password, &user.password).unwrap() {
             let my_claims = Claims{company: "".to_owned(), sub: user.username, exp: expiry};
             let token = encode(&Header::default(), &my_claims, "secret".as_ref()).unwrap();
             return Ok(HttpResponse::Ok().json(Token{data: token}))
+        } else {
+            return Ok(HttpResponse::Unauthorized().json(""))
         }
     }
 
