@@ -68,9 +68,9 @@ will return
 - authenticated endpoint
 - POST JSON to insert an event
 ```json
-{"event":{...}, "timestamp":{...}, "data":{...}}
+{"event":{...}, "id":{...}, "timestamp":{...}, "data":{...}}
 ```
-- where {...} is for the event a string, timestamp is the epoch unix timestamp when you want the event to become the current event, and data is any JSON you want
+- where {...} is for the event a string, id is an assigned uuid v4 for the event, timestamp is the epoch unix timestamp when you want the event to become the current event, and data is any JSON you want
 
 will return
 ```json
@@ -79,10 +79,10 @@ will return
 - where {...} is the uuid (string) of the event
 
 ```html
-/events/{event}
+/events/{id}
 ```
 - authenticated endpoint
-- do a GET request where {event} is the name of the event you want the events queue (sorted by ascending timestamp)
+- do a GET request where {id} is the uuid of the event you want the events queue (sorted by ascending timestamp)
 
 ```html
 /events/{id}/cancel
