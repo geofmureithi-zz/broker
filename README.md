@@ -27,7 +27,7 @@ The side-effect of this system is that the latest event is the schema. Old event
 ##### Step 1 - create a user
 
 ```html
-/users 
+POST /users 
 ```
 - public endpoint
 - POST JSON to create a user
@@ -45,7 +45,7 @@ will return
 ##### Step 2 - login with the user
 
 ```html
-/login 
+POST /login 
 ```
 - public endpoint
 - POST JSON to login
@@ -63,15 +63,15 @@ will return
 ##### Step 3 - insert an event
 
 ```html 
-/events 
+GET /events 
 ```
 - public endpoint
 - connect your sse-client to this endpoint
 
 ```html
-/insert 
+POST /insert 
 ```
-- authenticated endpoint
+- authenticated endpoint (Authorization: Bearer {jwt})
 - POST JSON to insert an event
 ```json
 {"event":{...}, "collection_id":{...}, "timestamp":{...}, "data":{...}}
@@ -87,15 +87,15 @@ will return
 ##### Optional Endpoints
 
 ```html
-/events/collections/{collection_id}
+GET /events/collections/{collection_id}
 ```
-- authenticated endpoint
+- authenticated endpoint (Authorization: Bearer {jwt})
 - do a GET request where {collection_id} is the uuid of the collection you want (sorted by ascending timestamp)
 
 ```html
-/events/{id}/cancel
+GET /events/{id}/cancel
 ``` 
-- authenticated endpoint
+- authenticated endpoint (Authorization: Bearer {jwt})
 - do a GET request where id is the uuid of the event to cancel a future event
 
 ### Features
