@@ -36,23 +36,49 @@ struct Login {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct User {
+    id: uuid::Uuid,
     username: String,
     password: String,
     info: serde_json::Value,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-struct JSON {
+struct UserForm {
+    username: String,
+    password: String,
+    info: serde_json::Value,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct Event {
+    id: uuid::Uuid,
+    user_id: uuid::Uuid,
     event: String,
     timestamp: i64,
     published: bool,
+    cancelled: bool,
+    data: serde_json::Value,
+}
+
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct EventForm {
+    event: String,
+    timestamp: i64,
     data: serde_json::Value,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct Path {
-    record: String
+struct EventPath {
+    event: String,
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+struct EventSubPath {
+    event: String,
+    id: String,
+}
+
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Claims {
@@ -61,7 +87,7 @@ struct Claims {
     exp: usize,
 }
 
-async fn collection(data: web::Data<MyData>, path: web::Path<Path>, req: HttpRequest) -> Result<HttpResponse, Error> {
+async fn collection(data: web::Data<MyData>, path: web::Path<EventPath>, req: HttpRequest) -> Result<HttpResponse, Error> {
 
     // get origin env var
     let config = envy::from_env::<Config>().unwrap();
@@ -96,21 +122,23 @@ async fn collection(data: web::Data<MyData>, path: web::Path<Path>, req: HttpReq
     }
 
     // turn iVec(s) to String(s) and make HashMap
-    let records: HashMap<String, serde_json::value::Value> = data.db.iter().into_iter().filter(|x| {
+    let mut records: Vec<Event> = data.db.iter().into_iter().filter(|x| {
         let p = x.as_ref().unwrap();
         let k = std::str::from_utf8(&p.0).unwrap().to_owned();
-        if k.contains(&path.record) {
+        let versioned = format!("{}_v_", path.event);
+        if k.contains(&versioned) {
             return true;
         } else {
             return false;
         }
     }).map(|x| {
         let p = x.unwrap();
-        let k = std::str::from_utf8(&p.0).unwrap().to_owned();
         let v = std::str::from_utf8(&p.1).unwrap().to_owned();
-        let j : serde_json::Value = serde_json::from_str(&v).unwrap_or_default();
-        (k, j)
+        let j : Event = serde_json::from_str(&v).unwrap();
+        j
     }).collect();
+
+    records.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
 
     // return data to json response as 200
     Ok(HttpResponse::Ok().json(records))
@@ -126,7 +154,7 @@ async fn new_client(data: web::Data<MyData>, broad: web::Data<Mutex<Broadcaster>
     let vals: HashMap<String, String> = data.db.iter().into_iter().filter(|x| {
         let p = x.as_ref().unwrap();
         let k = std::str::from_utf8(&p.0).unwrap().to_owned();
-        if !k.contains("_v_") {
+        if !k.contains("_v_") && !k.contains("_u_") {
             return true
         } else {
             return false
@@ -134,7 +162,7 @@ async fn new_client(data: web::Data<MyData>, broad: web::Data<Mutex<Broadcaster>
     }).map(|x| {
         let p = x.as_ref().unwrap();
         let v = std::str::from_utf8(&p.1).unwrap().to_owned();
-        let json : JSON = serde_json::from_str(&v).unwrap();
+        let json : Event = serde_json::from_str(&v).unwrap();
         let data : String = serde_json::to_string(&json.data).unwrap();
         (json.event, data)
     }).collect();
@@ -153,25 +181,40 @@ async fn new_client(data: web::Data<MyData>, broad: web::Data<Mutex<Broadcaster>
         .streaming(rx)
 }
 
-async fn insert(data: web::Data<MyData>, json: web::Json<JSON>, req: HttpRequest) -> Result<HttpResponse, Error> {
+async fn insert(data: web::Data<MyData>, json: web::Json<EventForm>, req: HttpRequest) -> Result<HttpResponse, Error> {
 
     // get origin env var
     let config = envy::from_env::<Config>().unwrap();
     let secret = config.secret;
 
+    let json_clone = json.clone();
+
     // verify jwt
     let headers = req.headers();
-    let mut check : i32 = 0;
     for (k, v) in headers {
         if k == "Authorization" {
             let token = v.to_str().unwrap().to_owned();
             let parts = token.split(" ");
             for part in parts {
                 if part != "Bearer" {
-                    let _ = match decode::<Claims>(&part, secret.as_ref(), &Validation::default()) {
-                        Ok(c) => {
-                            check = check + 1;
-                            c
+                     let _ = match decode::<Claims>(&part, secret.as_ref(), &Validation::default()) {
+                        Ok(token) => {
+
+                            let user_id_str = token.claims.sub;
+                            let user_id = uuid::Uuid::parse_str(&user_id_str).unwrap();
+
+                            let id = Uuid::new_v4();
+                            let j = Event{id: id, published: false, cancelled: false, data: json_clone.data, event: json_clone.event, timestamp: json.timestamp, user_id: user_id};
+                            let new_value_string = serde_json::to_string(&j).unwrap();
+                            let new_value = new_value_string.as_bytes();
+                            let versioned = format!("{}_v_{}", json.event, id.to_string());
+                        
+                            let _ = data.db.compare_and_swap(versioned, None as Option<&[u8]>, Some(new_value.clone())); 
+                            let _ = web::block(move || data.db.flush()).await;
+                        
+                            // return uuid to json response as 200
+                            let record = json!({ "id": id.to_string() });
+                            return Ok(HttpResponse::Ok().json(record))
                         },
                         Err(err) => match *err.kind() {
                             _ => return Ok(HttpResponse::Unauthorized().json(""))
@@ -181,28 +224,10 @@ async fn insert(data: web::Data<MyData>, json: web::Json<JSON>, req: HttpRequest
             }
         } 
     }
-
-    // if no auth header
-    if check == 0 {
-        return Ok(HttpResponse::Unauthorized().json(""))
-    }
-
-    // get new value from json
-    let new_value_string = serde_json::to_string(&json.0).unwrap();
-    let new_value = new_value_string.as_bytes();
-
-    // set as future value
-    let uuid = Uuid::new_v4();
-    let versioned = format!("{}_v_{}", json.0.event, uuid.to_string());
-    let _ = data.db.compare_and_swap(versioned.clone(), None as Option<&[u8]>, Some(new_value.clone())); 
-    let _ = web::block(move || data.db.flush()).await;
-
-    // return uuid to json response as 200
-    let record = json!({ "uuid": versioned });
-    Ok(HttpResponse::Ok().json(record))
+    Ok(HttpResponse::Unauthorized().json(""))
 }
 
-async fn cancel(data: web::Data<MyData>, path: web::Path<Path>, req: HttpRequest) -> Result<HttpResponse, Error> {
+async fn cancel(data: web::Data<MyData>, path: web::Path<EventSubPath>, req: HttpRequest) -> Result<HttpResponse, Error> {
 
     // get origin env var
     let config = envy::from_env::<Config>().unwrap();
@@ -236,18 +261,21 @@ async fn cancel(data: web::Data<MyData>, path: web::Path<Path>, req: HttpRequest
         return Ok(HttpResponse::Unauthorized().json(""))
     }
 
-    let p = &path.record;
-    let g = data.db.get(&p.as_bytes()).unwrap().unwrap();
+    let id = &path.id;
+    let event = &path.event;
+    let versioned = format!("{}_v_{}", event, id);
+
+    let g = data.db.get(&versioned.as_bytes()).unwrap().unwrap();
     let v = std::str::from_utf8(&g).unwrap().to_owned();
-    let mut json : JSON = serde_json::from_str(&v).unwrap();
+    let mut json : Event = serde_json::from_str(&v).unwrap();
     let j = json.clone();
-    json.published = true;
-    let _ = data.db.compare_and_swap(p.as_bytes(), Some(serde_json::to_string(&j).unwrap().as_bytes()), Some(serde_json::to_string(&json).unwrap().as_bytes()));
+    json.cancelled = true;
+    let _ = data.db.compare_and_swap(versioned.as_bytes(), Some(serde_json::to_string(&j).unwrap().as_bytes()), Some(serde_json::to_string(&json).unwrap().as_bytes()));
     let _ = web::block(move || { data.db.flush() }).await;
     Ok(HttpResponse::Ok().json(json))
 }
 
-async fn user_create(data: web::Data<MyData>, json: web::Json<User>) -> Result<HttpResponse, Error> {
+async fn user_create(data: web::Data<MyData>, json: web::Json<UserForm>) -> Result<HttpResponse, Error> {
 
     // turn iVec(s) to String(s) and make HashMap
     let records : HashMap<String, String> = data.db.iter().into_iter().filter(|x| {
@@ -267,17 +295,19 @@ async fn user_create(data: web::Data<MyData>, json: web::Json<User>) -> Result<H
     }).collect();
 
     if records.len() > 0 {
-        return Ok(HttpResponse::BadRequest().json(""))
+        let j = json!({"error": "username already taken"});
+        return Ok(HttpResponse::BadRequest().json(j))
     } else {
         // set as future value
         let uuid = Uuid::new_v4();
         let versioned = format!("{}_u_{}", json.username, uuid.to_string());
         let hashed = hash(json.clone().password, DEFAULT_COST).unwrap();
-        let new_user = User{username: json.clone().username, password: hashed, info: json.clone().info};
+        let new_user = User{id: uuid, username: json.clone().username, password: hashed, info: json.clone().info};
         
         let _ = data.db.compare_and_swap(versioned.as_bytes(), None as Option<&[u8]>, Some(serde_json::to_string(&new_user).unwrap().as_bytes())); 
         let _ = web::block(move || { data.db.flush() }).await;
-        return Ok(HttpResponse::Ok().json(""))
+        let j = json!({"id": uuid.to_string()});
+        return Ok(HttpResponse::Ok().json(j))
     }
 }
 
@@ -314,7 +344,7 @@ async fn login(data: web::Data<MyData>, json: web::Json<Login>) -> Result<HttpRe
     for (_k, v) in records {
         let user : User = serde_json::from_str(&v).unwrap();
         if user.username == json.username && verify(json.clone().password, &user.password).unwrap() {
-            let my_claims = Claims{company: "".to_owned(), sub: user.username, exp: expiry};
+            let my_claims = Claims{company: "".to_owned(), sub: user.id.to_string(), exp: expiry};
             let token = encode(&Header::default(), &my_claims, secret.as_ref()).unwrap();
             return Ok(HttpResponse::Ok().json(Token{jwt: token}))
         } else {
@@ -344,13 +374,18 @@ pub async fn broker_run(origin: String) -> std::result::Result<(), std::io::Erro
     // create event watcher
     let x = std::thread::spawn(move || {
         loop {
-            let vals : HashMap<String, JSON> = tree_cloned.iter().into_iter().filter(|x| {
+            let vals : HashMap<String, Event> = tree_cloned.iter().into_iter().filter(|x| {
                 let p = x.as_ref().unwrap();
+                let k = std::str::from_utf8(&p.0).unwrap().to_owned();
                 let v = std::str::from_utf8(&p.1).unwrap().to_owned();
-                let json : JSON = serde_json::from_str(&v).unwrap();
-                let now = Utc::now().timestamp();
-                if json.timestamp <= now && !json.published {
-                    return true
+                if k.contains("_v_") {
+                    let json : Event = serde_json::from_str(&v).unwrap();
+                    let now = Utc::now().timestamp();
+                    if json.timestamp <= now && !json.published && !json.cancelled {
+                        return true
+                    } else {
+                        return false
+                    }
                 } else {
                     return false
                 }
@@ -358,7 +393,7 @@ pub async fn broker_run(origin: String) -> std::result::Result<(), std::io::Erro
                 let p = x.as_ref().unwrap();
                 let k = std::str::from_utf8(&p.0).unwrap().to_owned();
                 let v = std::str::from_utf8(&p.1).unwrap().to_owned();
-                let json : JSON = serde_json::from_str(&v).unwrap();
+                let json : Event = serde_json::from_str(&v).unwrap();
                 let json_cloned = json.clone();
                 (k, json_cloned)
             }).collect();
@@ -396,8 +431,8 @@ pub async fn broker_run(origin: String) -> std::result::Result<(), std::io::Erro
             .data(MyData{ db: tree_actix.clone() })
             .route("/insert", web::post().to(insert))
             .route("/events", web::get().to(new_client))
-            .route("/collections/{record}", web::get().to(collection))
-            .route("/cancel/{record}", web::get().to(cancel))
+            .route("/events/{event}", web::get().to(collection))
+            .route("/events/{event}/{id}/cancel", web::get().to(cancel))
             .route("/users", web::post().to(user_create))
             .route("/login", web::post().to(login))
     })

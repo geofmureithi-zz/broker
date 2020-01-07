@@ -34,6 +34,12 @@ The side-effect of this system is that the latest event is the schema. Old event
 ```
 - where {...} is for username and string, password a string, and info any JSON you want
 
+will return
+```json
+{"id":{...}}
+```
+- where {...} is the uuid (string) of the user
+
 ```html
 /login 
 ```
@@ -62,27 +68,27 @@ will return
 - authenticated endpoint
 - POST JSON to insert an event
 ```json
-{"event":{...}, "published": false, "timestamp":{...}, "data":{...}}
+{"event":{...}, "timestamp":{...}, "data":{...}}
 ```
 - where {...} is for the event a string, timestamp is the epoch unix timestamp when you want the event to become the current event, and data is any JSON you want
 
 will return
 ```json
-{"uuid":{...}}
+{"id":{...}}
 ```
-- where {...} is a string
+- where {...} is the uuid (string) of the event
 
 ```html
-/collections/{event}
+/events/{event}
 ```
 - authenticated endpoint
-- do a GET request where {event} is the name of the event you want the event log
+- do a GET request where {event} is the name of the event you want the events queue (sorted by ascending timestamp)
 
 ```html
-/cancel/{uuid}
+/events/{id}/cancel
 ``` 
 - authenticated endpoint
-- do a GET request where (uuid) is the event uuid you want to cancel - this will mark the event published and it will not be published to the event stream - the event uuid can be obtained from the response from /insert or from /collection/{event}.
+- do a GET request where id is the uuid of the event to cancel a future event
 
 ### Features
 
