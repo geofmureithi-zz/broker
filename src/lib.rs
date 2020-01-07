@@ -53,6 +53,7 @@ struct UserForm {
 struct Event {
     id: uuid::Uuid,
     user_id: uuid::Uuid,
+    evt_id: uuid::Uuid,
     event: String,
     timestamp: i64,
     published: bool,
@@ -63,19 +64,14 @@ struct Event {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct EventForm {
+    id: uuid::Uuid,
     event: String,
     timestamp: i64,
     data: serde_json::Value,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct EventPath {
-    event: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct EventSubPath {
-    event: String,
+struct Path {
     id: String,
 }
 
@@ -87,7 +83,7 @@ struct Claims {
     exp: usize,
 }
 
-async fn collection(data: web::Data<MyData>, path: web::Path<EventPath>, req: HttpRequest) -> Result<HttpResponse, Error> {
+async fn collection(data: web::Data<MyData>, path: web::Path<Path>, req: HttpRequest) -> Result<HttpResponse, Error> {
 
     // get origin env var
     let config = envy::from_env::<Config>().unwrap();
@@ -125,8 +121,9 @@ async fn collection(data: web::Data<MyData>, path: web::Path<EventPath>, req: Ht
     let mut records: Vec<Event> = data.db.iter().into_iter().filter(|x| {
         let p = x.as_ref().unwrap();
         let k = std::str::from_utf8(&p.0).unwrap().to_owned();
-        let versioned = format!("{}_v_", path.event);
-        if k.contains(&versioned) {
+        let v = std::str::from_utf8(&p.1).unwrap().to_owned();
+        let j : Event = serde_json::from_str(&v).unwrap();
+        if k.contains(&"_v_") && j.evt_id.to_string() == path.id {
             return true;
         } else {
             return false;
@@ -204,10 +201,10 @@ async fn insert(data: web::Data<MyData>, json: web::Json<EventForm>, req: HttpRe
                             let user_id = uuid::Uuid::parse_str(&user_id_str).unwrap();
 
                             let id = Uuid::new_v4();
-                            let j = Event{id: id, published: false, cancelled: false, data: json_clone.data, event: json_clone.event, timestamp: json.timestamp, user_id: user_id};
+                            let j = Event{id: id, published: false, cancelled: false, data: json_clone.data, event: json_clone.event, timestamp: json.timestamp, user_id: user_id, evt_id: json.id};
                             let new_value_string = serde_json::to_string(&j).unwrap();
                             let new_value = new_value_string.as_bytes();
-                            let versioned = format!("{}_v_{}", json.event, id.to_string());
+                            let versioned = format!("_v_{}", id.to_string());
                         
                             let _ = data.db.compare_and_swap(versioned, None as Option<&[u8]>, Some(new_value.clone())); 
                             let _ = web::block(move || data.db.flush()).await;
@@ -227,7 +224,7 @@ async fn insert(data: web::Data<MyData>, json: web::Json<EventForm>, req: HttpRe
     Ok(HttpResponse::Unauthorized().json(""))
 }
 
-async fn cancel(data: web::Data<MyData>, path: web::Path<EventSubPath>, req: HttpRequest) -> Result<HttpResponse, Error> {
+async fn cancel(data: web::Data<MyData>, path: web::Path<Path>, req: HttpRequest) -> Result<HttpResponse, Error> {
 
     // get origin env var
     let config = envy::from_env::<Config>().unwrap();
@@ -262,8 +259,7 @@ async fn cancel(data: web::Data<MyData>, path: web::Path<EventSubPath>, req: Htt
     }
 
     let id = &path.id;
-    let event = &path.event;
-    let versioned = format!("{}_v_{}", event, id);
+    let versioned = format!("_v_{}", id);
 
     let g = data.db.get(&versioned.as_bytes()).unwrap().unwrap();
     let v = std::str::from_utf8(&g).unwrap().to_owned();
@@ -436,7 +432,7 @@ pub async fn broker_run(origin: String) -> std::result::Result<(), std::io::Erro
             .route("/insert", web::post().to(insert))
             .route("/events", web::get().to(new_client))
             .route("/events/{event}", web::get().to(collection))
-            .route("/events/{event}/{id}/cancel", web::get().to(cancel))
+            .route("/events/{id}/cancel", web::get().to(cancel))
             .route("/users", web::post().to(user_create))
             .route("/login", web::post().to(login))
     })
