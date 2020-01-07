@@ -281,12 +281,16 @@ async fn user_create(data: web::Data<MyData>, json: web::Json<UserForm>) -> Resu
     let records : HashMap<String, String> = data.db.iter().into_iter().filter(|x| {
         let p = x.as_ref().unwrap();
         let k = std::str::from_utf8(&p.0).unwrap().to_owned();
-        let search = format!("{}_u_", json.username);
-        if k.contains(&search) {
-            return true;
-        } else {
-            return false;
+        let v = std::str::from_utf8(&p.1).unwrap().to_owned();
+        if k.contains("_u_") {
+            let user : User = serde_json::from_str(&v).unwrap();
+            if user.username == json.username {
+                return true
+            } else {
+                return false
+            }
         }
+        return false
     }).map(|x| {
         let p = x.unwrap();
         let k = std::str::from_utf8(&p.0).unwrap().to_owned();
