@@ -121,12 +121,16 @@ async fn collection(data: web::Data<MyData>, path: web::Path<Path>, req: HttpReq
     let mut records: Vec<Event> = data.db.iter().into_iter().filter(|x| {
         let p = x.as_ref().unwrap();
         let k = std::str::from_utf8(&p.0).unwrap().to_owned();
-        let v = std::str::from_utf8(&p.1).unwrap().to_owned();
-        let j : Event = serde_json::from_str(&v).unwrap();
-        if k.contains(&"_v_") && j.evt_id.to_string() == path.id {
-            return true;
+        if k.contains(&"_v_") {
+            let v = std::str::from_utf8(&p.1).unwrap().to_owned();
+            let j : Event = serde_json::from_str(&v).unwrap();
+            if j.evt_id.to_string() == path.id {
+                return true
+            } else {
+                return false
+            }
         } else {
-            return false;
+            return false
         }
     }).map(|x| {
         let p = x.unwrap();
@@ -435,7 +439,7 @@ pub async fn broker_run(origin: String) -> std::result::Result<(), std::io::Erro
             .data(MyData{ db: tree_actix.clone() })
             .route("/insert", web::post().to(insert))
             .route("/events", web::get().to(new_client))
-            .route("/events/{event}", web::get().to(collection))
+            .route("/events/{id}", web::get().to(collection))
             .route("/events/{id}/cancel", web::get().to(cancel))
             .route("/users", web::post().to(user_create))
             .route("/login", web::post().to(login))
