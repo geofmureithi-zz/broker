@@ -15,7 +15,7 @@ Broker follows an insert-only/publish/subscribe paradigm rather than a REST CRUD
 
 ### How it works
 
-In Broker you create a user, login, then insert an event and its data with a timestamp. Broker publishes the event when the timestamp is reached to the event stream via SSE. Broker keeps all event versions in its database that can be viewed. Broker can also cancel future events.
+In Broker you create a user, login, then insert an event with its data, a collection_id, and a timestamp. Broker publishes the event when the timestamp is reached to the event stream via SSE. Broker keeps all events its database that can be viewed in collections (by collection_id). Broker can also cancel future events.
 
 When the client first subscribes to the SSE connection all the latest events and data is sent to the client. Combined with sending the latest event via SSE when subscribed negates the necessity to do any GET API requests in the lifecycle of an event.
 
@@ -23,6 +23,8 @@ The side-effect of this system is that the latest event is the schema. Old event
 
 
 #### API
+
+##### Step 1 - create a user
 
 ```html
 /users 
@@ -40,6 +42,8 @@ will return
 ```
 - where {...} is the uuid (string) of the user
 
+##### Step 2 - login with the user
+
 ```html
 /login 
 ```
@@ -56,6 +60,8 @@ will return
 ```
 - where {...} is a JWT (string)
 
+##### Step 3 - insert an event
+
 ```html 
 /events 
 ```
@@ -68,9 +74,9 @@ will return
 - authenticated endpoint
 - POST JSON to insert an event
 ```json
-{"event":{...}, "id":{...}, "timestamp":{...}, "data":{...}}
+{"event":{...}, "collection_id":{...}, "timestamp":{...}, "data":{...}}
 ```
-- where {...} is for the event a string, id is an assigned uuid v4 for the event, timestamp is the epoch unix timestamp when you want the event to become the current event, and data is any JSON you want
+- where {...} is for the event a string, collection_id is an assigned uuid v4 for the event collection, timestamp is the epoch unix timestamp when you want the event to become the current event, and data is any JSON you want
 
 will return
 ```json
@@ -78,11 +84,13 @@ will return
 ```
 - where {...} is the uuid (string) of the event
 
+##### Optional Endpoints
+
 ```html
-/events/{id}
+/events/collections/{collection_id}
 ```
 - authenticated endpoint
-- do a GET request where {id} is the uuid of the event you want the events queue (sorted by ascending timestamp)
+- do a GET request where {collection_id} is the uuid of the collection you want (sorted by ascending timestamp)
 
 ```html
 /events/{id}/cancel
