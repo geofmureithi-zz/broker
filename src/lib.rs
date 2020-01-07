@@ -10,6 +10,8 @@ use uuid::Uuid;
 use serde_json::json;
 use bcrypt::{DEFAULT_COST, hash, verify};
 use jsonwebtoken::{encode, decode, Header, Validation};
+use itertools::Itertools;
+use std::iter::FromIterator;
 
 #[derive(Deserialize, Debug)]
 pub struct Config {
@@ -21,6 +23,31 @@ pub struct Config {
 
 struct MyData {
     db: sled::Db
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct Events (Vec<HashMap<String, HashMap<uuid::Uuid, Vec<Event>>>>);
+
+impl Events {
+    fn new() -> Events {
+        Events(Vec::new())
+    }
+
+    fn add(&mut self, elem: HashMap<String, HashMap<uuid::Uuid, Vec<Event>>>) {
+        self.0.push(elem);
+    }
+}
+
+impl std::iter::FromIterator<HashMap<String, HashMap<uuid::Uuid, Vec<Event>>>> for Events {
+    fn from_iter<I: IntoIterator<Item=HashMap<String, HashMap<uuid::Uuid, Vec<Event>>>>>(iter: I) -> Self {
+        let mut c = Events::new();
+
+        for i in iter {
+            c.add(i);
+        }
+
+        c
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -53,6 +80,7 @@ struct UserForm {
 struct Event {
     id: uuid::Uuid,
     user_id: uuid::Uuid,
+    evt_id: uuid::Uuid,
     event: String,
     timestamp: i64,
     published: bool,
@@ -63,19 +91,14 @@ struct Event {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct EventForm {
+    id: uuid::Uuid,
     event: String,
     timestamp: i64,
     data: serde_json::Value,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct EventPath {
-    event: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct EventSubPath {
-    event: String,
+struct Path {
     id: String,
 }
 
@@ -85,63 +108,6 @@ struct Claims {
     sub: String,
     company: String,
     exp: usize,
-}
-
-async fn collection(data: web::Data<MyData>, path: web::Path<EventPath>, req: HttpRequest) -> Result<HttpResponse, Error> {
-
-    // get origin env var
-    let config = envy::from_env::<Config>().unwrap();
-    let secret = config.secret;
-
-    // verify jwt
-    let headers = req.headers();
-    let mut check : i32 = 0;
-    for (k, v) in headers {
-        if k == "Authorization" {
-            let token = v.to_str().unwrap().to_owned();
-            let parts = token.split(" ");
-            for part in parts {
-                if part != "Bearer" {
-                    let _ = match decode::<Claims>(&part, secret.as_ref(), &Validation::default()) {
-                        Ok(c) => {
-                            check = check + 1;
-                            c
-                        },
-                        Err(err) => match *err.kind() {
-                            _ => return Ok(HttpResponse::Unauthorized().json(""))
-                        },
-                    };
-                }
-            }
-        } 
-    }
-
-    // if no auth header
-    if check == 0 {
-        return Ok(HttpResponse::Unauthorized().json(""))
-    }
-
-    // turn iVec(s) to String(s) and make HashMap
-    let mut records: Vec<Event> = data.db.iter().into_iter().filter(|x| {
-        let p = x.as_ref().unwrap();
-        let k = std::str::from_utf8(&p.0).unwrap().to_owned();
-        let versioned = format!("{}_v_", path.event);
-        if k.contains(&versioned) {
-            return true;
-        } else {
-            return false;
-        }
-    }).map(|x| {
-        let p = x.unwrap();
-        let v = std::str::from_utf8(&p.1).unwrap().to_owned();
-        let j : Event = serde_json::from_str(&v).unwrap();
-        j
-    }).collect();
-
-    records.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
-
-    // return data to json response as 200
-    Ok(HttpResponse::Ok().json(records))
 }
 
 async fn new_client(data: web::Data<MyData>, broad: web::Data<Mutex<Broadcaster>>) -> impl Responder {
@@ -204,10 +170,11 @@ async fn insert(data: web::Data<MyData>, json: web::Json<EventForm>, req: HttpRe
                             let user_id = uuid::Uuid::parse_str(&user_id_str).unwrap();
 
                             let id = Uuid::new_v4();
-                            let j = Event{id: id, published: false, cancelled: false, data: json_clone.data, event: json_clone.event, timestamp: json.timestamp, user_id: user_id};
+                            let j = Event{id: id, published: false, cancelled: false, data: json_clone.data, event: json_clone.event, timestamp: json.timestamp, user_id: user_id, evt_id: json.id};
                             let new_value_string = serde_json::to_string(&j).unwrap();
                             let new_value = new_value_string.as_bytes();
-                            let versioned = format!("{}_v_{}", json.event, id.to_string());
+
+                            let versioned = format!("_v_{}", id.to_string());
                         
                             let _ = data.db.compare_and_swap(versioned, None as Option<&[u8]>, Some(new_value.clone())); 
                             let _ = web::block(move || data.db.flush()).await;
@@ -227,7 +194,7 @@ async fn insert(data: web::Data<MyData>, json: web::Json<EventForm>, req: HttpRe
     Ok(HttpResponse::Unauthorized().json(""))
 }
 
-async fn cancel(data: web::Data<MyData>, path: web::Path<EventSubPath>, req: HttpRequest) -> Result<HttpResponse, Error> {
+async fn cancel(data: web::Data<MyData>, path: web::Path<Path>, req: HttpRequest) -> Result<HttpResponse, Error> {
 
     // get origin env var
     let config = envy::from_env::<Config>().unwrap();
@@ -262,8 +229,7 @@ async fn cancel(data: web::Data<MyData>, path: web::Path<EventSubPath>, req: Htt
     }
 
     let id = &path.id;
-    let event = &path.event;
-    let versioned = format!("{}_v_{}", event, id);
+    let versioned = format!("_v_{}", id);
 
     let g = data.db.get(&versioned.as_bytes()).unwrap().unwrap();
     let v = std::str::from_utf8(&g).unwrap().to_owned();
@@ -402,20 +368,39 @@ pub async fn broker_run(origin: String) -> std::result::Result<(), std::io::Erro
                 (k, json_cloned)
             }).collect();
 
+            let vals_cloned = vals.clone();
+
             for (k, v) in vals {
                 let old_json = v.clone();
                 let old_json_clone = old_json.clone();
                 let mut new_json = v.clone();
                 new_json.published = true;
-                let _ = tree_cloned.compare_and_swap(old_json.event.as_bytes(), None as Option<&[u8]>, Some(b""));
-                let old_json_og = tree_cloned.get(old_json.event).unwrap().unwrap();
-                let old_value = std::str::from_utf8(&old_json_og).unwrap().to_owned();
-                let _ = tree_cloned.compare_and_swap(old_json_clone.event.as_bytes(), Some(old_value.as_bytes()), Some(serde_json::to_string(&new_json).unwrap().as_bytes()));
                 let _ = tree_cloned.compare_and_swap(k, Some(serde_json::to_string(&old_json_clone).unwrap().as_bytes()), Some(serde_json::to_string(&new_json).unwrap().as_bytes())); 
                 let _ = tree_cloned.flush();
-                broadcast(new_json.event, serde_json::to_string(&new_json.data).unwrap(), events_cloned.clone());
             }
-       }  
+
+            let eventz : Vec<Event> = vals_cloned.iter().map(|(_x, y)| {
+                y.clone()
+            }).collect();
+
+            let groups : Events = eventz.into_iter()
+                .group_by(|evt| evt.event)
+                .into_iter()
+                .map(|(event, group)| {
+                    // let evts : Vec<Event> = group.into_iter().map(|x| { x.clone() }).collect();
+                    let groups = group.into_iter().group_by(|evt| evt.evt_id);
+                    let mut x = HashMap::new();
+                    x.insert(event, groups);
+                    x
+                })
+                .collect();
+
+        }
+            
+
+            // for (k, v) in grouped {
+            //     broadcast(k, serde_json::to_string(&v).unwrap(), events_cloned.clone());
+            // }
     });
     x.thread();
 
@@ -435,8 +420,7 @@ pub async fn broker_run(origin: String) -> std::result::Result<(), std::io::Erro
             .data(MyData{ db: tree_actix.clone() })
             .route("/insert", web::post().to(insert))
             .route("/events", web::get().to(new_client))
-            .route("/events/{event}", web::get().to(collection))
-            .route("/events/{event}/{id}/cancel", web::get().to(cancel))
+            .route("/events/{id}/cancel", web::get().to(cancel))
             .route("/users", web::post().to(user_create))
             .route("/login", web::post().to(login))
     })

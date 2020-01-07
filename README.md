@@ -68,21 +68,15 @@ will return
 - authenticated endpoint
 - POST JSON to insert an event
 ```json
-{"event":{...}, "timestamp":{...}, "data":{...}}
+{"event":{...}, "id":{...}, "timestamp":{...}, "data":{...}}
 ```
-- where {...} is for the event a string, timestamp is the epoch unix timestamp when you want the event to become the current event, and data is any JSON you want
+- where {...} is for the event a string, id is a uuid v4 you provide, timestamp is the epoch unix timestamp when you want the event to become the current event, and data is any JSON you want
 
 will return
 ```json
 {"id":{...}}
 ```
 - where {...} is the uuid (string) of the event
-
-```html
-/events/{event}
-```
-- authenticated endpoint
-- do a GET request where {event} is the name of the event you want the events queue (sorted by ascending timestamp)
 
 ```html
 /events/{id}/cancel
@@ -100,8 +94,7 @@ will return
 * Handles future events via Epoch UNIX timestamp
 * Stateful immutable event persistence
 * Insert event via JSON POST request 
-* Sync latest events on SSE client connection
-* Event log via GET request
+* Sync latest events with audit trail on SSE client connection
 * Event cancellation via GET request
 
 ### Use
