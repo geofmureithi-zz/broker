@@ -148,7 +148,7 @@ async fn new_client(data: web::Data<MyData>, broad: web::Data<Mutex<Broadcaster>
     let origin = config.origin;
 
     // turn iVec(s) to String(s) and make HashMap
-    let vals: HashMap<String, String> = data.db.iter().into_iter().filter(|x| {
+    let mut vals: HashMap<String, String> = data.db.iter().into_iter().filter(|x| {
         let p = x.as_ref().unwrap();
         let k = std::str::from_utf8(&p.0).unwrap().to_owned();
         if !k.contains("_v_") && !k.contains("_u_") {
@@ -163,6 +163,11 @@ async fn new_client(data: web::Data<MyData>, broad: web::Data<Mutex<Broadcaster>
         let data : String = serde_json::to_string(&json.data).unwrap();
         (json.event, data)
     }).collect();
+
+    if vals.is_empty() {
+        vals = HashMap::new();
+        vals.insert("connection".to_owned(), "connected".to_owned());
+    }
 
     // create new client for sse with hashmap of initial values
     let rx = broad.lock().unwrap().new_client(vals);
@@ -328,8 +333,7 @@ async fn login(data: web::Data<MyData>, json: web::Json<Login>) -> Result<HttpRe
     let records : HashMap<String, String> = data.db.iter().into_iter().filter(|x| {
         let p = x.as_ref().unwrap();
         let k = std::str::from_utf8(&p.0).unwrap().to_owned();
-        let search = format!("{}_u_", json.username);
-        if k.contains(&search) {
+        if k.contains(&"_u_") {
             return true;
         } else {
             return false;
