@@ -300,7 +300,7 @@ async fn user_create(data: web::Data<MyData>, json: web::Json<UserForm>) -> Resu
     } else {
         // set as future value
         let uuid = Uuid::new_v4();
-        let versioned = format!("{}_u_{}", json.username, uuid.to_string());
+        let versioned = format!("user_u_{}", uuid.to_string());
         let hashed = hash(json.clone().password, DEFAULT_COST).unwrap();
         let new_user = User{id: uuid, username: json.clone().username, password: hashed, info: json.clone().info};
         
