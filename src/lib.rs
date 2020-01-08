@@ -17,6 +17,7 @@ pub struct Config {
   pub origin: String,
   expiry: i64,
   secret: String,
+  save_path: String,
 }
 
 struct MyData {
@@ -470,7 +471,7 @@ pub async fn broker_run(origin: String) -> std::result::Result<(), std::io::Erro
     let ip = format!("0.0.0.0:{}", config.port);
   
     // setup db and sse
-    let tree = sled::open("./tmp/data").unwrap();
+    let tree = sled::open(config.save_path).unwrap();
     let events = Broadcaster::create();
     let tree_cloned = tree.clone();
     let tree_actix = tree.clone();

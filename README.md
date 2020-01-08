@@ -142,7 +142,7 @@ async fn main() -> std::result::Result<(), std::io::Error> {
 - the PORT needs to be passed in as an environment variable
 - the EXPIRY (for jwts) needs to be passed in as an environment variable
 - the SECRET (for jwts) needs to be passed in as an environment variable
-- the file database saves to ``` ./tmp ``` of the project root
+- the SAVE_PATH where the embedded database will save needs to be passed in as an environment variable
 
 ### Install
 
@@ -155,7 +155,6 @@ sudo snap install broker
 - the ORIGIN needs to be passed in as an environment variable
 - the EXPIRY (for jwts) needs to be passed in as an environment variable
 - the SECRET (for jwts) needs to be passed in as an environment variable
-- the file database saves to ``` ./tmp ``` of the project root
 
 ### Run Example
 
