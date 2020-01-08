@@ -1,7 +1,6 @@
 ## Broker - Real-time Zero-Code API Server
 
 [![crates.io](https://meritbadge.herokuapp.com/broker)](https://crates.io/crates/broker)
-[![broker](https://snapcraft.io//broker/badge.svg)](https://snapcraft.io/broker)
 
 ### Purpose
 
@@ -143,18 +142,6 @@ async fn main() -> std::result::Result<(), std::io::Error> {
 - the EXPIRY (for jwts) needs to be passed in as an environment variable
 - the SECRET (for jwts) needs to be passed in as an environment variable
 - the SAVE_PATH where the embedded database will save needs to be passed in as an environment variable
-
-### Install
-
-#### Linux
-```bash
-sudo snap install broker
-```
-
-- the PORT needs to be passed in as an environment variable
-- the ORIGIN needs to be passed in as an environment variable
-- the EXPIRY (for jwts) needs to be passed in as an environment variable
-- the SECRET (for jwts) needs to be passed in as an environment variable
 
 ### Run Example
 
