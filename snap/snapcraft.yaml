@@ -18,4 +18,4 @@ parts:
 
 apps:
   broker:
-    command: bin/broker
+    command: env PATH=$SNAP/bin:$PATH broker
