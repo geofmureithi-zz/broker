@@ -19,3 +19,4 @@ parts:
 apps:
   broker:
     command: bin/broker
+    daemon: simple
