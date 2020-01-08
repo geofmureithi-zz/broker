@@ -151,7 +151,6 @@ async fn main() -> std::result::Result<(), std::io::Error> {
 sudo snap install broker
 ```
 
-- broker will run as a daemon
 - the PORT needs to be passed in as an environment variable
 - the ORIGIN needs to be passed in as an environment variable
 - the EXPIRY (for jwts) needs to be passed in as an environment variable
