@@ -24,6 +24,8 @@ The side-effect of this system is that the latest event is the schema. Old event
 
 #### API
 
+- this library is 1.0.0 and the API is stable
+
 ##### Step 1 - create a user
 
 ```html
