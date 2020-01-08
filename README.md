@@ -163,3 +163,10 @@ async fn main() -> std::result::Result<(), std::io::Error> {
 * [Event Sourcing](https://microservices.io/patterns/data/event-sourcing.html)
 * [Best in Place](https://github.com/bernat/best_in_place)
 * [Brock Whitten](https://www.youtube.com/watch?v=qljYMEfVukU)
+
+### Install
+
+#### Linux
+```bash
+sudo snap install broker
+```
