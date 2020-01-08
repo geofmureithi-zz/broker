@@ -1,11 +1,7 @@
 mod lib;
-use lib::{broker_run, Config};
+use lib::{broker_run};
 
 #[actix_rt::main]
-async fn main() -> () {
-    // get origin env var
-    let config = envy::from_env::<Config>().unwrap();
-    let origin = config.origin;
-      
-    let _ = broker_run(origin).await;
+async fn main() -> std::result::Result<(), std::io::Error> {
+    broker_run().await
 }

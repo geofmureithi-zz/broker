@@ -133,15 +133,17 @@ use broker::{broker_run};
 
 #[actix_rt::main]
 async fn main() -> std::result::Result<(), std::io::Error> {
-    broker_run("http://localhost:3000".to_owned()).await
+    broker_run().await
 }
 ```
 
 - the only param is the origin you want to allow - wildcard is not supported
+- the ORIGIN (CORS) needs to be passed in as an environment variable
 - the PORT needs to be passed in as an environment variable
 - the EXPIRY (for jwts) needs to be passed in as an environment variable
 - the SECRET (for jwts) needs to be passed in as an environment variable
 - the SAVE_PATH where the embedded database will save needs to be passed in as an environment variable
+- example: PORT=8080 SAVE_PATH=./tmp ORIGIN=http://localhost:3000 EXPIRY=3600 SECRET=secret broker
 
 ### Run Example
 

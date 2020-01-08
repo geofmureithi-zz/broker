@@ -14,7 +14,7 @@ use jsonwebtoken::{encode, decode, Header, Validation};
 #[derive(Deserialize, Debug)]
 pub struct Config {
   port: String,
-  pub origin: String,
+  origin: String,
   expiry: i64,
   secret: String,
   save_path: String,
@@ -461,7 +461,7 @@ async fn login(data: web::Data<MyData>, json: web::Json<Login>) -> Result<HttpRe
     Ok(HttpResponse::Unauthorized().json(""))
 }
 
-pub async fn broker_run(origin: String) -> std::result::Result<(), std::io::Error> {
+pub async fn broker_run() -> std::result::Result<(), std::io::Error> {
     // set actix web env vars
     std::env::set_var("RUST_LOG", "actix_web=debug,actix_server=info");
     env_logger::init();
@@ -469,6 +469,7 @@ pub async fn broker_run(origin: String) -> std::result::Result<(), std::io::Erro
     // get port env var
     let config = envy::from_env::<Config>().unwrap();
     let ip = format!("0.0.0.0:{}", config.port);
+    let origin = config.origin;
   
     // setup db and sse
     let tree = sled::open(config.save_path).unwrap();
