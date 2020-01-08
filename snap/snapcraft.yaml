@@ -18,4 +18,4 @@ parts:
 
 apps:
   broker:
-    command: bin/xsv
+    command: bin/broker
