@@ -9,13 +9,21 @@ description: |
   Broker follows an insert-only/publish/subscribe paradigm rather than a REST CRUD paradigm. 
 
 grade: stable # must be 'stable' to release into candidate/stable channels
-confinement: devmode # use 'strict' once you have the right plugs and slots
+confinement: strict # use 'strict' once you have the right plugs and slots
 
 parts:
   broker:
     plugin: rust
     source: .
 
+plugs:
+  config-broker:
+    interface: personal-files
+    read:
+    - $HOME/.broker/data
+    write:
+    - $HOME/.broker/data
+
 apps:
   broker:
-    command: env PATH=$SNAP/bin:$PATH broker
+    command: env PATH=$SNAP/bin:$PATH SAVE_PATH=$HOME/.broker/data broker
