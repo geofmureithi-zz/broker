@@ -39,14 +39,14 @@ struct User {
     id: uuid::Uuid,
     username: String,
     password: String,
-    info: serde_json::Value,
+    collection_id: uuid::Uuid,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct UserForm {
     username: String,
     password: String,
-    info: serde_json::Value,
+    collection_id: uuid::Uuid,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -82,6 +82,75 @@ struct Claims {
     company: String,
     exp: usize,
 }
+
+async fn user_collection(data: web::Data<MyData>, req: HttpRequest) -> Result<HttpResponse, Error> {
+
+    // get origin env var
+    let config = envy::from_env::<Config>().unwrap();
+    let secret = config.secret;
+
+    let mut id = "".to_owned();
+    // verify jwt
+    let headers = req.headers();
+    let mut check : i32 = 0;
+    for (k, v) in headers {
+        if k == "Authorization" {
+            let token = v.to_str().unwrap().to_owned();
+            let parts = token.split(" ");
+            for part in parts {
+                if part != "Bearer" {
+                    let _ = match decode::<Claims>(&part, secret.as_ref(), &Validation::default()) {
+                        Ok(c) => {
+                            check = check + 1;
+                            id = c.claims.sub;
+                        },
+                        Err(err) => match *err.kind() {
+                            _ => return Ok(HttpResponse::Unauthorized().json(""))
+                        },
+                    };
+                }
+            }
+        } 
+    }
+
+    // if no auth header
+    if check == 0 {
+        return Ok(HttpResponse::Unauthorized().json(""))
+    }
+
+    let versioned = format!("_u_{}", id);
+    let g = data.db.get(&versioned.as_bytes()).unwrap().unwrap();
+    let v = std::str::from_utf8(&g).unwrap().to_owned();
+    let user : User = serde_json::from_str(&v).unwrap();
+
+    // turn iVec(s) to String(s) and make HashMap
+    let mut records: Vec<Event> = data.db.iter().into_iter().filter(|x| {
+        let p = x.as_ref().unwrap();
+        let k = std::str::from_utf8(&p.0).unwrap().to_owned();
+        if k.contains(&"_v_") {
+            let v = std::str::from_utf8(&p.1).unwrap().to_owned();
+            let j : Event = serde_json::from_str(&v).unwrap();
+            if j.collection_id.to_string() == user.collection_id.to_string() {
+                return true
+            } else {
+                return false
+            }
+        } else {
+            return false
+        }
+    }).map(|x| {
+        let p = x.unwrap();
+        let v = std::str::from_utf8(&p.1).unwrap().to_owned();
+        let j : Event = serde_json::from_str(&v).unwrap();
+        j
+    }).collect();
+
+    records.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+
+    // return data to json response as 200
+    Ok(HttpResponse::Ok().json(records))
+}
+
 
 async fn collection(data: web::Data<MyData>, path: web::Path<Path>, req: HttpRequest) -> Result<HttpResponse, Error> {
 
@@ -304,9 +373,9 @@ async fn user_create(data: web::Data<MyData>, json: web::Json<UserForm>) -> Resu
     } else {
         // set as future value
         let uuid = Uuid::new_v4();
-        let versioned = format!("user_u_{}", uuid.to_string());
+        let versioned = format!("_u_{}", uuid.to_string());
         let hashed = hash(json.clone().password, DEFAULT_COST).unwrap();
-        let new_user = User{id: uuid, username: json.clone().username, password: hashed, info: json.clone().info};
+        let new_user = User{id: uuid, username: json.clone().username, password: hashed, collection_id: json.collection_id };
         
         let _ = data.db.compare_and_swap(versioned.as_bytes(), None as Option<&[u8]>, Some(serde_json::to_string(&new_user).unwrap().as_bytes())); 
         let _ = web::block(move || { data.db.flush() }).await;
@@ -332,12 +401,16 @@ async fn login(data: web::Data<MyData>, json: web::Json<Login>) -> Result<HttpRe
     let records : HashMap<String, String> = data.db.iter().into_iter().filter(|x| {
         let p = x.as_ref().unwrap();
         let k = std::str::from_utf8(&p.0).unwrap().to_owned();
-        let v = std::str::from_utf8(&p.1).unwrap().to_owned();
-        let user : User = serde_json::from_str(&v).unwrap();
-        if k.contains(&"_u_") && user.username == json.username {
-            return true;
+        if k.contains(&"_u_") {
+            let v = std::str::from_utf8(&p.1).unwrap().to_owned();
+            let user : User = serde_json::from_str(&v).unwrap();
+            if user.username == json.username {
+                return true
+            } else {
+                return false
+            }
         } else {
-            return false;
+            return false
         }
     }).map(|x| {
         let p = x.unwrap();
@@ -440,6 +513,7 @@ pub async fn broker_run(origin: String) -> std::result::Result<(), std::io::Erro
             .route("/events", web::get().to(new_client))
             .route("/events/collections/{id}", web::get().to(collection))
             .route("/events/{id}/cancel", web::get().to(cancel))
+            .route("/events/user", web::get().to(user_collection))
             .route("/users", web::post().to(user_create))
             .route("/login", web::post().to(login))
     })

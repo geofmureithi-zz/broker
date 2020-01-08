@@ -32,9 +32,9 @@ POST /users
 - public endpoint
 - POST JSON to create a user
 ```json
-{"username":{...}, "password":{...}, "info":{...}}
+{"username":{...}, "password":{...}, "collection_id":{...}}
 ```
-- where {...} is for username and string, password a string, and info any JSON you want
+- where {...} is for username and string, password a string, and collection_id is the uuid of the event collection for user info
 
 will return
 ```json
@@ -91,6 +91,13 @@ GET /events/collections/{collection_id}
 ```
 - authenticated endpoint (Authorization: Bearer {jwt})
 - do a GET request where {collection_id} is the uuid of the collection you want (sorted by ascending timestamp)
+
+```html
+GET /events/user
+``` 
+- authenticated endpoint (Authorization: Bearer {jwt})
+- do a GET request to get the user info event collection (sorted by ascending timestamp)
+
 
 ```html
 GET /events/{id}/cancel
