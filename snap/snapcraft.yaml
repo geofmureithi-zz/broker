@@ -14,7 +14,7 @@ confinement: strict # use 'strict' once you have the right plugs and slots
 parts:
   broker:
     plugin: rust
-    source: ./
+    source: .
 
 apps:
   broker:
