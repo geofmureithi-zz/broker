@@ -96,8 +96,13 @@ GET /events/collections/{collection_id}
 GET /events/user
 ``` 
 - authenticated endpoint (Authorization: Bearer {jwt})
-- do a GET request to get the user info event collection (sorted by ascending timestamp)
+- do a GET request to get the user event collections (sorted by ascending timestamp)
 
+will return
+```json
+{"info": {...}, "events":{...}}
+```
+- where (...) is for info a list of events for user info and events a list of all events that the user inserted
 
 ```html
 GET /events/{id}/cancel

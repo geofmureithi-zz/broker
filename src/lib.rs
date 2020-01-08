@@ -124,7 +124,7 @@ async fn user_collection(data: web::Data<MyData>, req: HttpRequest) -> Result<Ht
     let user : User = serde_json::from_str(&v).unwrap();
 
     // turn iVec(s) to String(s) and make HashMap
-    let mut records: Vec<Event> = data.db.iter().into_iter().filter(|x| {
+    let mut info: Vec<Event> = data.db.iter().into_iter().filter(|x| {
         let p = x.as_ref().unwrap();
         let k = std::str::from_utf8(&p.0).unwrap().to_owned();
         if k.contains(&"_v_") {
@@ -145,10 +145,35 @@ async fn user_collection(data: web::Data<MyData>, req: HttpRequest) -> Result<Ht
         j
     }).collect();
 
-    records.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+    info.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+
+    // turn iVec(s) to String(s) and make HashMap
+    let mut owned: Vec<Event> = data.db.iter().into_iter().filter(|x| {
+        let p = x.as_ref().unwrap();
+        let k = std::str::from_utf8(&p.0).unwrap().to_owned();
+        if k.contains(&"_v_") {
+            let v = std::str::from_utf8(&p.1).unwrap().to_owned();
+            let j : Event = serde_json::from_str(&v).unwrap();
+            if j.user_id.to_string() == user.id.to_string() {
+                return true
+            } else {
+                return false
+            }
+        } else {
+            return false
+        }
+    }).map(|x| {
+        let p = x.unwrap();
+        let v = std::str::from_utf8(&p.1).unwrap().to_owned();
+        let j : Event = serde_json::from_str(&v).unwrap();
+        j
+    }).collect();
+
+    owned.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
 
     // return data to json response as 200
-    Ok(HttpResponse::Ok().json(records))
+    let j = json!({"info": info, "events": owned});
+    Ok(HttpResponse::Ok().json(j))
 }
 
 
