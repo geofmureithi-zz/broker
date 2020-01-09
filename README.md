@@ -136,9 +136,7 @@ async fn main() -> std::result::Result<(), std::io::Error> {
     broker_run().await
 }
 ```
-
-- the only param is the origin you want to allow - wildcard is not supported
-- the ORIGIN (CORS) needs to be passed in as an environment variable
+- the ORIGIN (CORS) needs to be passed in as an environment variable - wildcard is not supported
 - the PORT needs to be passed in as an environment variable
 - the EXPIRY (for jwts) needs to be passed in as an environment variable
 - the SECRET (for jwts) needs to be passed in as an environment variable
