@@ -76,9 +76,10 @@ fn full_test() {
     let res = client.post("http://localhost:8000/insert")
         .header("Authorization", &bearer)
         .json(&event)
-        .send().unwrap()
-        .status();
-    assert_eq!(res, 200);
+        .send().unwrap();
+    assert_eq!(res.status(), 200);
+    let event : broker::Record = serde_json::from_str(&res.text().unwrap()).unwrap();
+    assert_eq!(event.event.published, false);
 
     // try getting collection without auth - want failure
     let res = client.get("http://localhost:8000/events/collections/123")
@@ -86,11 +87,17 @@ fn full_test() {
         .status();
     assert_eq!(res, 401);
 
+    // pause for a second to process job
+    let one_second = std::time::Duration::from_millis(500);
+    std::thread::sleep(one_second);
+
     // get collection - want success
     let res = client.get("http://localhost:8000/events/collections/3ca76743-8d99-4d3f-b85c-633ea456f90c")
         .header("Authorization", &bearer)
         .send().unwrap();
     assert_eq!(res.status(), 200);
+    let events : broker::Collection = serde_json::from_str(&res.text().unwrap()).unwrap();
+    assert_eq!(events.events[0].published, true);
 
     // try getting user without auth - want failure
     let res = client.get("http://localhost:8000/events/user")
@@ -111,4 +118,13 @@ fn full_test() {
         .send().unwrap()
         .status();
     assert_eq!(res, 401);
+
+    // try cancelling without auth - want failure
+    let client = reqwest::blocking::Client::new();
+    let url = format!("http://localhost:8000/events/{}/cancel", event.event.id);
+    let res = client.get(&url)
+        .header("Authorization", &bearer)
+        .send().unwrap()
+        .status();
+    assert_eq!(res, 200);
 }

@@ -53,15 +53,31 @@ struct UserForm {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-struct Event {
-    id: uuid::Uuid,
-    user_id: uuid::Uuid,
-    collection_id: uuid::Uuid,
-    event: String,
-    timestamp: i64,
-    published: bool,
-    cancelled: bool,
-    data: serde_json::Value,
+pub struct UserCollection {
+    pub info: Vec<Event>,
+    pub events: Vec<Event>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Collection {
+    pub events: Vec<Event>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Record {
+    pub event: Event,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Event {
+    pub id: uuid::Uuid,
+    pub user_id: uuid::Uuid,
+    pub collection_id: uuid::Uuid,
+    pub event: String,
+    pub timestamp: i64,
+    pub published: bool,
+    pub cancelled: bool,
+    pub data: serde_json::Value,
 }
 
 
@@ -171,7 +187,7 @@ async fn user_collection(data: web::Data<MyData>, req: HttpRequest) -> Result<Ht
     owned.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
 
     // return data to json response as 200
-    let j = json!({"info": info, "events": owned});
+    let j = UserCollection{info: info, events: owned};
     Ok(HttpResponse::Ok().json(j))
 }
 
@@ -231,7 +247,8 @@ async fn collection(data: web::Data<MyData>, path: web::Path<Path>, req: HttpReq
     records.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
 
     // return data to json response as 200
-    Ok(HttpResponse::Ok().json(records))
+    let j = Collection{events: records};
+    Ok(HttpResponse::Ok().json(j))
 }
 
 #[cfg_attr(tarpaulin, skip)]
@@ -296,7 +313,7 @@ async fn insert(data: web::Data<MyData>, json: web::Json<EventForm>, req: HttpRe
                             let _ = web::block(move || data.db.flush()).await;
                         
                             // return uuid to json response as 200
-                            let record = json!({ "id": id.to_string() });
+                            let record = Record{ event: j};
                             return Ok(HttpResponse::Ok().json(record))
                         },
                         Err(err) => match *err.kind() {
@@ -350,7 +367,8 @@ async fn cancel(data: web::Data<MyData>, path: web::Path<Path>, req: HttpRequest
     json.cancelled = true;
     let _ = data.db.compare_and_swap(versioned.as_bytes(), Some(serde_json::to_string(&j).unwrap().as_bytes()), Some(serde_json::to_string(&json).unwrap().as_bytes()));
     let _ = web::block(move || { data.db.flush() }).await;
-    Ok(HttpResponse::Ok().json(json))
+    let record = Record{ event: json};
+    Ok(HttpResponse::Ok().json(record))
 }
 
 async fn user_create(data: web::Data<MyData>, json: web::Json<UserForm>) -> Result<HttpResponse, Error> {

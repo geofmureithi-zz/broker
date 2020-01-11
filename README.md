@@ -97,9 +97,9 @@ POST /insert
 
 will return
 ```json
-{"id":{...}}
+{"event":{...}}
 ```
-- where {...} is the uuid (string) of the event
+- where {...} is the event
 
 ##### Optional Endpoints
 
@@ -108,6 +108,12 @@ GET /events/collections/{collection_id}
 ```
 - authenticated endpoint (Authorization: Bearer {jwt})
 - do a GET request where {collection_id} is the uuid of the collection you want (sorted by ascending timestamp)
+
+will return
+```json
+{"events":{...}}
+```
+- where {...} is the array of events
 
 ```html
 GET /events/user
@@ -126,6 +132,12 @@ GET /events/{id}/cancel
 ``` 
 - authenticated endpoint (Authorization: Bearer {jwt})
 - do a GET request where id is the uuid of the event to cancel a future event
+
+will return
+```json
+{"event":{...}}
+```
+- where {...} is the event
 
 ### Use
 
