@@ -29,7 +29,6 @@ fn full_test() {
     let _ = rx.recv().unwrap();
 
     let user1 = json!({"username": "rust22", "password": "rust", "collection_id":"3ca76743-8d99-4d3f-b85c-633ea456f90c"});
-    let user2 = json!({"username": "rust23", "password": "rust", "collection_id":"3ca76743-8d99-4d3f-b85c-633ea456f90c"});
     let user1_login = json!({"username": "rust22", "password": "rust"});
     let event = json!({"event": "test", "collection_id": "3ca76743-8d99-4d3f-b85c-633ea456f90c", "timestamp": 1578667309, "data": "{}"});
 
@@ -42,16 +41,9 @@ fn full_test() {
         .status();
     assert_eq!(res, 200);
 
-    // create user 2 - want success
-    let res = client.post("http://localhost:8000/users")
-        .json(&user2)
-        .send().unwrap()
-        .status();
-    assert_eq!(res, 200);
-
     // try to create user 2 again - want failure
     let res = client.post("http://localhost:8000/users")
-        .json(&user2)
+        .json(&user1)
         .send().unwrap()
         .status();
     assert_eq!(res, 400);
