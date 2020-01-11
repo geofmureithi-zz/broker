@@ -11,22 +11,24 @@ use serde_json::json;
 use bcrypt::{DEFAULT_COST, hash, verify};
 use jsonwebtoken::{encode, decode, Header, Validation};
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct Config {
-  port: String,
-  origin: String,
-  expiry: i64,
-  secret: String,
-  save_path: String,
+  pub port: String,
+  pub origin: String,
+  pub expiry: i64,
+  pub secret: String,
+  pub save_path: String,
 }
 
+#[derive(Debug, Clone)]
 struct MyData {
-    db: sled::Db
+    db: sled::Db,
+    config: Config,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-struct Token {
-    jwt: String
+pub struct Token {
+    pub jwt: String
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -86,10 +88,6 @@ struct Claims {
 
 async fn user_collection(data: web::Data<MyData>, req: HttpRequest) -> Result<HttpResponse, Error> {
 
-    // get origin env var
-    let config = envy::from_env::<Config>().unwrap();
-    let secret = config.secret;
-
     let mut id = "".to_owned();
     // verify jwt
     let headers = req.headers();
@@ -100,7 +98,7 @@ async fn user_collection(data: web::Data<MyData>, req: HttpRequest) -> Result<Ht
             let parts = token.split(" ");
             for part in parts {
                 if part != "Bearer" {
-                    let _ = match decode::<Claims>(&part, secret.as_ref(), &Validation::default()) {
+                    let _ = match decode::<Claims>(&part, data.config.secret.as_ref(), &Validation::default()) {
                         Ok(c) => {
                             check = check + 1;
                             id = c.claims.sub;
@@ -180,10 +178,6 @@ async fn user_collection(data: web::Data<MyData>, req: HttpRequest) -> Result<Ht
 
 async fn collection(data: web::Data<MyData>, path: web::Path<Path>, req: HttpRequest) -> Result<HttpResponse, Error> {
 
-    // get origin env var
-    let config = envy::from_env::<Config>().unwrap();
-    let secret = config.secret;
-
     // verify jwt
     let headers = req.headers();
     let mut check : i32 = 0;
@@ -193,7 +187,7 @@ async fn collection(data: web::Data<MyData>, path: web::Path<Path>, req: HttpReq
             let parts = token.split(" ");
             for part in parts {
                 if part != "Bearer" {
-                    let _ = match decode::<Claims>(&part, secret.as_ref(), &Validation::default()) {
+                    let _ = match decode::<Claims>(&part, data.config.secret.as_ref(), &Validation::default()) {
                         Ok(c) => {
                             check = check + 1;
                             c
@@ -240,11 +234,8 @@ async fn collection(data: web::Data<MyData>, path: web::Path<Path>, req: HttpReq
     Ok(HttpResponse::Ok().json(records))
 }
 
+#[cfg_attr(tarpaulin, skip)]
 async fn new_client(data: web::Data<MyData>, broad: web::Data<Mutex<Broadcaster>>) -> impl Responder {
-
-    // get origin env var
-    let config = envy::from_env::<Config>().unwrap();
-    let origin = config.origin;
 
     // turn iVec(s) to String(s) and make HashMap
     let vals: HashMap<String, String> = data.db.iter().into_iter().filter(|x| {
@@ -265,6 +256,7 @@ async fn new_client(data: web::Data<MyData>, broad: web::Data<Mutex<Broadcaster>
 
     // create new client for sse with hashmap of initial values
     let rx = broad.lock().unwrap().new_client(vals);
+    let origin = &*data.config.origin;
 
     // create sse endpoint
     HttpResponse::Ok()
@@ -278,11 +270,6 @@ async fn new_client(data: web::Data<MyData>, broad: web::Data<Mutex<Broadcaster>
 }
 
 async fn insert(data: web::Data<MyData>, json: web::Json<EventForm>, req: HttpRequest) -> Result<HttpResponse, Error> {
-
-    // get origin env var
-    let config = envy::from_env::<Config>().unwrap();
-    let secret = config.secret;
-
     let json_clone = json.clone();
 
     // verify jwt
@@ -293,7 +280,7 @@ async fn insert(data: web::Data<MyData>, json: web::Json<EventForm>, req: HttpRe
             let parts = token.split(" ");
             for part in parts {
                 if part != "Bearer" {
-                     let _ = match decode::<Claims>(&part, secret.as_ref(), &Validation::default()) {
+                     let _ = match decode::<Claims>(&part, data.config.secret.as_ref(), &Validation::default()) {
                         Ok(token) => {
 
                             let user_id_str = token.claims.sub;
@@ -325,10 +312,6 @@ async fn insert(data: web::Data<MyData>, json: web::Json<EventForm>, req: HttpRe
 
 async fn cancel(data: web::Data<MyData>, path: web::Path<Path>, req: HttpRequest) -> Result<HttpResponse, Error> {
 
-    // get origin env var
-    let config = envy::from_env::<Config>().unwrap();
-    let secret = config.secret;
-
     // verify jwt
     let headers = req.headers();
     let mut check : i32 = 0;
@@ -338,7 +321,7 @@ async fn cancel(data: web::Data<MyData>, path: web::Path<Path>, req: HttpRequest
             let parts = token.split(" ");
             for part in parts {
                 if part != "Bearer" {
-                    let _ = match decode::<Claims>(&part, secret.as_ref(), &Validation::default()) {
+                    let _ = match decode::<Claims>(&part, data.config.secret.as_ref(), &Validation::default()) {
                         Ok(c) => {
                             check = check + 1;
                             c
@@ -411,16 +394,9 @@ async fn user_create(data: web::Data<MyData>, json: web::Json<UserForm>) -> Resu
 }
 
 async fn login(data: web::Data<MyData>, json: web::Json<Login>) -> Result<HttpResponse, Error> {
-
-    // get origin env var
-    let config = envy::from_env::<Config>().unwrap();
-    let exp = config.expiry;
-    let secret = config.secret;
-
-
     // add timestamp
     let now = Utc::now().timestamp();
-    let expi = now + exp;
+    let expi = now + data.config.expiry;
     let expiry = expi as usize;
 
     // turn iVec(s) to String(s) and make HashMap
@@ -451,7 +427,7 @@ async fn login(data: web::Data<MyData>, json: web::Json<Login>) -> Result<HttpRe
         let verified = verify(json_cloned.password, &user.password).unwrap();
         if verified {
             let my_claims = Claims{company: "".to_owned(), sub: user.id.to_string(), exp: expiry};
-            let token = encode(&Header::default(), &my_claims, secret.as_ref()).unwrap();
+            let token = encode(&Header::default(), &my_claims, data.config.secret.as_ref()).unwrap();
             return Ok(HttpResponse::Ok().json(Token{jwt: token}))
         } else {
             return Ok(HttpResponse::Unauthorized().json(""))
@@ -461,22 +437,25 @@ async fn login(data: web::Data<MyData>, json: web::Json<Login>) -> Result<HttpRe
     Ok(HttpResponse::Unauthorized().json(""))
 }
 
-pub async fn broker_run() -> std::result::Result<(), std::io::Error> {
-    // set actix web env vars
+#[cfg_attr(tarpaulin, skip)]
+pub async fn broker_run() -> Result<(), std::io::Error> {
+    let config = envy::from_env::<Config>().unwrap();
     std::env::set_var("RUST_LOG", "actix_web=debug,actix_server=info");
     env_logger::init();
+    server_create(config).await
+}
 
-    // get port env var
-    let config = envy::from_env::<Config>().unwrap();
+#[cfg_attr(tarpaulin, skip)]
+pub fn server_create(config: Config) -> actix_server::Server {
     let ip = format!("0.0.0.0:{}", config.port);
-    let origin = config.origin;
-  
+
     // setup db and sse
-    let tree = sled::open(config.save_path).unwrap();
+    let tree = sled::open(&config.save_path).unwrap();
     let events = Broadcaster::create();
     let tree_cloned = tree.clone();
     let tree_actix = tree.clone();
     let events_cloned = events.clone();
+    let config_cloned = config.clone();
 
     // create event watcher
     let x = std::thread::spawn(move || {
@@ -527,7 +506,7 @@ pub async fn broker_run() -> std::result::Result<(), std::io::Error> {
             .wrap(middleware::Logger::default())
             .wrap(
                 Cors::new()
-                    .allowed_origin(&origin)
+                    .allowed_origin(&config.origin)
                     .allowed_methods(vec!["GET", "POST"])
                     .allowed_headers(vec![header::AUTHORIZATION, header::ACCEPT, header::CONTENT_TYPE])
                     .max_age(3600)
@@ -535,7 +514,7 @@ pub async fn broker_run() -> std::result::Result<(), std::io::Error> {
             )
             .app_data(events.clone())
             .app_data(web::JsonConfig::default())
-            .data(MyData{ db: tree_actix.clone() })
+            .data(MyData{ db: tree_actix.clone(), config: config_cloned.clone() })
             .route("/insert", web::post().to(insert))
             .route("/events", web::get().to(new_client))
             .route("/events/collections/{id}", web::get().to(collection))
@@ -546,5 +525,4 @@ pub async fn broker_run() -> std::result::Result<(), std::io::Error> {
     })
     .bind(ip).unwrap()
     .run()
-    .await
 }

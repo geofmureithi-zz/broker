@@ -1,6 +1,8 @@
 ## Broker - Real-time Zero-Code API Server
 
 [![crates.io](https://meritbadge.herokuapp.com/broker)](https://crates.io/crates/broker)
+[![Build Status](https://travis-ci.org/apibillme/broker.svg?branch=master)](https://travis-ci.org/apibillme/broker)
+[![codecov](https://codecov.io/gh/apibillme/broker/branch/master/graph/badge.svg)](https://codecov.io/gh/apibillme/broker)
 
 ### Purpose
 
@@ -146,6 +148,10 @@ async fn main() -> std::result::Result<(), std::io::Error> {
 ### Run Example
 
 - ``` make ```
+
+### Run Integration Tests
+
+- ``` cargo test ```
 
 ### Under the Hood
 
