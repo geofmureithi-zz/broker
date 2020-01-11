@@ -14,6 +14,19 @@ Broker is born from the need that rather than building a complex REST API with w
 
 Broker follows an insert-only/publish/subscribe paradigm rather than a REST CRUD paradigm. 
 
+### Features
+
+* Very performant with a low memory footprint
+* Real-time Event Stream via SSE
+* CORS support
+* Handles SSE client timeouts
+* Provides user authentication with JWTs and Bcrypt(ed) passwords
+* Handles future events via Epoch UNIX timestamp
+* Stateful immutable event persistence
+* Insert event via JSON POST request 
+* Sync latest events on SSE client connection
+* Event log via GET request
+* Event cancellation via GET request
 
 ### How it works
 
@@ -113,20 +126,6 @@ GET /events/{id}/cancel
 ``` 
 - authenticated endpoint (Authorization: Bearer {jwt})
 - do a GET request where id is the uuid of the event to cancel a future event
-
-### Features
-
-* Very performant with a low memory footprint
-* Real-time Event Stream via SSE
-* CORS support
-* Handles SSE client timeouts
-* Provides user authentication with JWTs and Bcrypt(ed) passwords
-* Handles future events via Epoch UNIX timestamp
-* Stateful immutable event persistence
-* Insert event via JSON POST request 
-* Sync latest events on SSE client connection
-* Event log via GET request
-* Event cancellation via GET request
 
 ### Use
 
