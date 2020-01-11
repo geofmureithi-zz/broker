@@ -2,7 +2,6 @@
 
 [![crates.io](https://meritbadge.herokuapp.com/broker)](https://crates.io/crates/broker)
 [![Build Status](https://travis-ci.org/apibillme/broker.svg?branch=master)](https://travis-ci.org/apibillme/broker)
-[![codecov](https://codecov.io/gh/apibillme/broker/branch/master/graph/badge.svg)](https://codecov.io/gh/apibillme/broker)
 
 ### Purpose
 

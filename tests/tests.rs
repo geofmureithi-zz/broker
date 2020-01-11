@@ -118,36 +118,18 @@ fn insert_success() {
 
     let client = reqwest::blocking::Client::new();
     let res = client.post("http://localhost:8002/insert")
+        .json(&event)
+        .send().unwrap()
+        .status();
+    assert_eq!(res, 401);
+
+    let client = reqwest::blocking::Client::new();
+    let res = client.post("http://localhost:8002/insert")
         .header("Authorization", bearer)
         .json(&event)
         .send().unwrap()
         .status();
     assert_eq!(res, 200);
-}
-
-#[test]
-#[cfg_attr(tarpaulin, skip)]
-fn insert_failure_no_auth_header() {
-    let (tx, rx) = mpsc::channel();
-
-    thread::spawn(move || {
-        let id = uuid::Uuid::new_v4();
-        let p = format!("./tmp/{}", id.to_string());
-        let c = broker::Config{port: "8003".to_owned(), origin: "http://localhost:3000".to_owned(), expiry: 3600, secret: "secret".to_owned(), save_path: p};
-    
-        let _ = run_app(tx, c);
-    });
-
-    let _ = rx.recv().unwrap();
-
-    let event = json!({"event": "test", "collection_id": "3ca76743-8d99-4d3f-b85c-633ea456f90c", "timestamp": 1578667309, "data": "{}"});
-
-    let client = reqwest::blocking::Client::new();
-    let res = client.post("http://localhost:8003/insert")
-        .json(&event)
-        .send().unwrap()
-        .status();
-    assert_eq!(res, 401);
 }
 
 #[test]
