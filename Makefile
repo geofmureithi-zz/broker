@@ -6,3 +6,5 @@ build:
 	sudo snapcraft
 publish:
 	sudo snapcraft push --release stable *.snap
+cover:
+	cargo tarpaulin
