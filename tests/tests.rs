@@ -29,14 +29,23 @@ fn full_test() {
     let _ = rx.recv().unwrap();
 
     let user1 = json!({"username": "rust22", "password": "rust", "collection_id":"3ca76743-8d99-4d3f-b85c-633ea456f90c"});
+    let user2 = json!({"username": "rust23", "password": "rust", "collection_id":"3ca76743-8d99-4d3f-b85c-633ea456f90d"});
     let user1_login = json!({"username": "rust22", "password": "rust"});
-    let event = json!({"event": "test", "collection_id": "3ca76743-8d99-4d3f-b85c-633ea456f90c", "timestamp": 1578667309, "data": "{}"});
+    let event1 = json!({"event": "test", "collection_id": "3ca76743-8d99-4d3f-b85c-633ea456f90c", "timestamp": 1578667309, "data": "{}"});
+    let event2 = json!({"event": "user", "collection_id": "3ca76743-8d99-4d3f-b85c-633ea456f90d", "timestamp": 1578667309, "data": "{}"});
 
     let client = reqwest::blocking::Client::new();
 
     // create user 1 - want success
     let res = client.post("http://localhost:8000/users")
         .json(&user1)
+        .send().unwrap()
+        .status();
+    assert_eq!(res, 200);
+
+    // create user 2 - want success
+    let res = client.post("http://localhost:8000/users")
+        .json(&user2)
         .send().unwrap()
         .status();
     assert_eq!(res, 200);
@@ -59,7 +68,23 @@ fn full_test() {
 
     // try posting event without auth - want failure
     let res = client.post("http://localhost:8000/insert")
-        .json(&event)
+        .json(&event1)
+        .send().unwrap()
+        .status();
+    assert_eq!(res, 401);
+
+    // try posting event with bad auth - want failure
+    let res = client.post("http://localhost:8000/insert")
+        .header("Authorization", "foo")
+        .json(&event1)
+        .send().unwrap()
+        .status();
+    assert_eq!(res, 401);
+
+    // try posting event with bad auth - want failure
+    let res = client.post("http://localhost:8000/insert")
+        .header("Authorization", "Bearer 1234")
+        .json(&event1)
         .send().unwrap()
         .status();
     assert_eq!(res, 401);
@@ -67,7 +92,16 @@ fn full_test() {
     // post event - want success
     let res = client.post("http://localhost:8000/insert")
         .header("Authorization", &bearer)
-        .json(&event)
+        .json(&event1)
+        .send().unwrap();
+    assert_eq!(res.status(), 200);
+    let event : broker::Record = serde_json::from_str(&res.text().unwrap()).unwrap();
+    assert_eq!(event.event.published, false);
+
+    // post event - want success
+    let res = client.post("http://localhost:8000/insert")
+        .header("Authorization", &bearer)
+        .json(&event2)
         .send().unwrap();
     assert_eq!(res.status(), 200);
     let event : broker::Record = serde_json::from_str(&res.text().unwrap()).unwrap();

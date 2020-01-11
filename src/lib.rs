@@ -102,12 +102,8 @@ struct Claims {
     exp: usize,
 }
 
-async fn user_collection(data: web::Data<MyData>, req: HttpRequest) -> Result<HttpResponse, Error> {
-
-    let mut id = "".to_owned();
-    // verify jwt
+fn auth(data: web::Data<MyData>, req: HttpRequest) -> (bool, Claims) {
     let headers = req.headers();
-    let mut check : i32 = 0;
     for (k, v) in headers {
         if k == "Authorization" {
             let token = v.to_str().unwrap().to_owned();
@@ -116,24 +112,27 @@ async fn user_collection(data: web::Data<MyData>, req: HttpRequest) -> Result<Ht
                 if part != "Bearer" {
                     let _ = match decode::<Claims>(&part, data.config.secret.as_ref(), &Validation::default()) {
                         Ok(c) => {
-                            check = check + 1;
-                            id = c.claims.sub;
+                            return (true, c.claims)
                         },
-                        Err(err) => match *err.kind() {
-                            _ => return Ok(HttpResponse::Unauthorized().json(""))
-                        },
+                        Err(_e) => {
+                            return (false, Claims{company: "".to_owned(), exp: 0, sub: "".to_owned()})
+                        }
                     };
                 }
             }
-        } 
+        }
     }
+    (false, Claims{company: "".to_owned(), exp: 0, sub: "".to_owned()})
+}
 
-    // if no auth header
-    if check == 0 {
+async fn user_collection(data: web::Data<MyData>, req: HttpRequest) -> Result<HttpResponse, Error> {
+
+    let (check, token) = auth(data.clone(), req.clone());
+    if !check {
         return Ok(HttpResponse::Unauthorized().json(""))
     }
 
-    let versioned = format!("_u_{}", id);
+    let versioned = format!("_u_{}", token.sub);
     let g = data.db.get(&versioned.as_bytes()).unwrap().unwrap();
     let v = std::str::from_utf8(&g).unwrap().to_owned();
     let user : User = serde_json::from_str(&v).unwrap();
@@ -194,31 +193,8 @@ async fn user_collection(data: web::Data<MyData>, req: HttpRequest) -> Result<Ht
 
 async fn collection(data: web::Data<MyData>, path: web::Path<Path>, req: HttpRequest) -> Result<HttpResponse, Error> {
 
-    // verify jwt
-    let headers = req.headers();
-    let mut check : i32 = 0;
-    for (k, v) in headers {
-        if k == "Authorization" {
-            let token = v.to_str().unwrap().to_owned();
-            let parts = token.split(" ");
-            for part in parts {
-                if part != "Bearer" {
-                    let _ = match decode::<Claims>(&part, data.config.secret.as_ref(), &Validation::default()) {
-                        Ok(c) => {
-                            check = check + 1;
-                            c
-                        },
-                        Err(err) => match *err.kind() {
-                            _ => return Ok(HttpResponse::Unauthorized().json(""))
-                        },
-                    };
-                }
-            }
-        } 
-    }
-
-    // if no auth header
-    if check == 0 {
+    let (check, _token) = auth(data.clone(), req.clone());
+    if !check {
         return Ok(HttpResponse::Unauthorized().json(""))
     }
 
@@ -287,73 +263,35 @@ async fn new_client(data: web::Data<MyData>, broad: web::Data<Mutex<Broadcaster>
 }
 
 async fn insert(data: web::Data<MyData>, json: web::Json<EventForm>, req: HttpRequest) -> Result<HttpResponse, Error> {
-    let json_clone = json.clone();
-
-    // verify jwt
-    let headers = req.headers();
-    for (k, v) in headers {
-        if k == "Authorization" {
-            let token = v.to_str().unwrap().to_owned();
-            let parts = token.split(" ");
-            for part in parts {
-                if part != "Bearer" {
-                     let _ = match decode::<Claims>(&part, data.config.secret.as_ref(), &Validation::default()) {
-                        Ok(token) => {
-
-                            let user_id_str = token.claims.sub;
-                            let user_id = uuid::Uuid::parse_str(&user_id_str).unwrap();
-
-                            let id = Uuid::new_v4();
-                            let j = Event{id: id, published: false, cancelled: false, data: json_clone.data, event: json_clone.event, timestamp: json.timestamp, user_id: user_id, collection_id: json.collection_id};
-                            let new_value_string = serde_json::to_string(&j).unwrap();
-                            let new_value = new_value_string.as_bytes();
-                            let versioned = format!("_v_{}", id.to_string());
-                        
-                            let _ = data.db.compare_and_swap(versioned, None as Option<&[u8]>, Some(new_value.clone())); 
-                            let _ = web::block(move || data.db.flush()).await;
-                        
-                            // return uuid to json response as 200
-                            let record = Record{ event: j};
-                            return Ok(HttpResponse::Ok().json(record))
-                        },
-                        Err(err) => match *err.kind() {
-                            _ => return Ok(HttpResponse::Unauthorized().json(""))
-                        },
-                    };
-                }
-            }
-        } 
+ 
+    let (check, token) = auth(data.clone(), req.clone());
+    if !check {
+        return Ok(HttpResponse::Unauthorized().json(""))
     }
-    Ok(HttpResponse::Unauthorized().json(""))
+
+    let user_id_str = token.sub;
+    let user_id = uuid::Uuid::parse_str(&user_id_str).unwrap();
+
+    let json_cloned = json.clone();
+
+    let id = Uuid::new_v4();
+    let j = Event{id: id, published: false, cancelled: false, data: json_cloned.data, event: json_cloned.event, timestamp: json.timestamp, user_id: user_id, collection_id: json.collection_id};
+    let new_value_string = serde_json::to_string(&j).unwrap();
+    let new_value = new_value_string.as_bytes();
+    let versioned = format!("_v_{}", id.to_string());
+
+    let _ = data.db.compare_and_swap(versioned, None as Option<&[u8]>, Some(new_value.clone())); 
+    let _ = web::block(move || data.db.flush()).await;
+
+    // return uuid to json response as 200
+    let record = Record{ event: j};
+    Ok(HttpResponse::Ok().json(record))
 }
 
 async fn cancel(data: web::Data<MyData>, path: web::Path<Path>, req: HttpRequest) -> Result<HttpResponse, Error> {
 
-    // verify jwt
-    let headers = req.headers();
-    let mut check : i32 = 0;
-    for (k, v) in headers {
-        if k == "Authorization" {
-            let token = v.to_str().unwrap().to_owned();
-            let parts = token.split(" ");
-            for part in parts {
-                if part != "Bearer" {
-                    let _ = match decode::<Claims>(&part, data.config.secret.as_ref(), &Validation::default()) {
-                        Ok(c) => {
-                            check = check + 1;
-                            c
-                        },
-                        Err(err) => match *err.kind() {
-                            _ => return Ok(HttpResponse::Unauthorized().json(""))
-                        },
-                    };
-                }
-            }
-        } 
-    }
-    
-    // if no auth header
-    if check == 0 {
+    let (check, _token) = auth(data.clone(), req.clone());
+    if !check {
         return Ok(HttpResponse::Unauthorized().json(""))
     }
 
