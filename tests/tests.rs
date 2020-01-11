@@ -93,11 +93,17 @@ fn full_test() {
     assert_eq!(res.status(), 200);
 
     // try getting user without auth - want failure
-    let client = reqwest::blocking::Client::new();
     let res = client.get("http://localhost:8000/events/user")
         .send().unwrap()
         .status();
     assert_eq!(res, 401);
+
+    // get user collection - want success
+    let res = client.get("http://localhost:8000/events/user")
+        .header("Authorization", &bearer)
+        .send().unwrap()
+        .status();
+    assert_eq!(res, 200);
 
     // try cancelling without auth - want failure
     let client = reqwest::blocking::Client::new();
@@ -105,5 +111,4 @@ fn full_test() {
         .send().unwrap()
         .status();
     assert_eq!(res, 401);
-
 }
