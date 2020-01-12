@@ -158,10 +158,6 @@ fn full_test() {
     let event : broker::Record = serde_json::from_str(&res.text().unwrap()).unwrap();
     assert_eq!(event.event.cancelled, true);
 
-    // pause for a second to process job
-    let one_second = std::time::Duration::from_millis(500);
-    std::thread::sleep(one_second);
-
     // get collection - want success
     let res = client.get("http://localhost:8000/events/collections/3ca76743-8d99-4d3f-b85c-633ea456f90d")
         .header("Authorization", &bearer)
