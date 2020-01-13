@@ -38,6 +38,13 @@ When the client first subscribes to the SSE connection all the latest events and
 The side-effect of this system is that the latest event is the schema. Old events are saved in the database and are not changed but the latest event is the schema for the front-end. This is pure NoSQL as the backend is agnostic to the event data.
 
 
+### Recommeded Services/Libraries to use with Broker
+* [Integromat](https://www.integromat.com/) - No-code Event Scheduler that supports many apps like GitHub, Meetup, and etc.
+* [React Hooks SSE](https://www.npmjs.com/package/react-hooks-sse) - SSE hook for React
+* [React Hook Form](https://react-hook-form.com/) - Best form library for React
+* [React Debounce Input](https://www.npmjs.com/package/react-debounce-input) - React input for Real-time Submission (Edit in Place forms)
+
+
 #### API
 
 - this library is 1.0.0 and the API is stable
