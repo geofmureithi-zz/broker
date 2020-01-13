@@ -3,6 +3,7 @@
 [![crates.io](https://meritbadge.herokuapp.com/broker)](https://crates.io/crates/broker)
 [![Build Status](https://travis-ci.org/apibillme/broker.svg?branch=master)](https://travis-ci.org/apibillme/broker)
 [![codecov](https://codecov.io/gh/apibillme/broker/branch/master/graph/badge.svg)](https://codecov.io/gh/apibillme/broker)
+[![broker](https://snapcraft.io//broker/badge.svg)](https://snapcraft.io/broker)
 
 ### Purpose
 
@@ -149,12 +150,17 @@ async fn main() -> std::result::Result<(), std::io::Error> {
     broker_run().await
 }
 ```
-- the ORIGIN (CORS) needs to be passed in as an environment variable - wildcard is not supported
-- the PORT needs to be passed in as an environment variable
-- the EXPIRY (for jwts) needs to be passed in as an environment variable
-- the SECRET (for jwts) needs to be passed in as an environment variable
-- the SAVE_PATH where the embedded database will save needs to be passed in as an environment variable
-- example: PORT=8080 SAVE_PATH=./tmp ORIGIN=http://localhost:3000 EXPIRY=3600 SECRET=secret broker
+- the origin (CORS) needs to be passed in as a flag with wildcard not supported
+- the port needs to be passed in as a flag
+- the expiry (for jwts) needs to be passed in as a flag
+- the secret (for jwts) needs to be passed in as a flag
+- the save_path where the embedded database will save needs to be passed in as an environment variable (not for snap)
+- example: SAVE_PATH=./tmp/broker_data broker -port 8080 -origin http://localhost:3000 -expiry 3600 -secret secret
+
+## Install (Linux)
+``` sudo snap install broker ```
+- does not run as a daemon as requires flags
+- the snap saves the database in $HOME/broker_data - this cannot be changed
 
 ### Run Example
 

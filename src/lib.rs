@@ -20,6 +20,11 @@ pub struct Config {
   pub save_path: String,
 }
 
+#[derive(Deserialize, Debug, Clone)]
+pub struct Cfg {
+  pub save_path: String,
+}
+
 #[derive(Debug, Clone)]
 struct MyData {
     db: sled::Db,
@@ -395,9 +400,23 @@ async fn login(data: web::Data<MyData>, json: web::Json<Login>) -> Result<HttpRe
 
 #[cfg_attr(tarpaulin, skip)]
 pub async fn broker_run() -> Result<(), std::io::Error> {
-    let config = envy::from_env::<Config>().unwrap();
+    let mut port = "8080".to_owned();
+    let mut expiry : i64 = 3600;
+    let mut origin = "http://localhost:3000".to_owned();
+    let mut secret = "secret".to_owned();
+    let _ : Vec<String> = go_flag::parse(|flags| {
+        flags.add_flag("port", &mut port);
+        flags.add_flag("expiry", &mut expiry);
+        flags.add_flag("origin", &mut origin);
+        flags.add_flag("secret", &mut secret);
+    });
+
     std::env::set_var("RUST_LOG", "actix_web=debug,actix_server=info");
     env_logger::init();
+
+    let cfg = envy::from_env::<Cfg>().unwrap();
+
+    let config = Config{port: port, origin: origin, secret: secret, save_path: cfg.save_path, expiry: expiry};
     server_create(config).await
 }
 

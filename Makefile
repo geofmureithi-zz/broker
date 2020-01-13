@@ -1,10 +1,12 @@
 run:
-	PORT=8080 SAVE_PATH=./tmp ORIGIN=http://localhost:3000 EXPIRY=3600 SECRET=secret cargo run
-release:
-	PORT=8080 SAVE_PATH=./tmp ORIGIN=http://localhost:3000 EXPIRY=3600 SECRET=secret cargo run --release
+	SAVE_PATH=./tmp/broker_data cargo run
 build:
 	sudo snapcraft
+edge:
+	sudo snapcraft push --release edge *.snap
 publish:
 	sudo snapcraft push --release stable *.snap
 cover:
 	cargo tarpaulin
+purge:
+	sudo multipass delete snapcraft-broker && sudo multipass purge
