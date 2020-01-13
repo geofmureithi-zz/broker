@@ -29,6 +29,10 @@ fn full_test() {
 
     let _ = rx.recv().unwrap();
 
+    // pause for a second to process job
+    let one_second = std::time::Duration::from_millis(500);
+    std::thread::sleep(one_second);
+
     let user1 = json!({"username": "rust22", "password": "rust", "collection_id":"3ca76743-8d99-4d3f-b85c-633ea456f90c"});
     let user2 = json!({"username": "rust23", "password": "rust", "collection_id":"3ca76743-8d99-4d3f-b85c-633ea456f90d"});
     let user1_login = json!({"username": "rust22", "password": "rust"});
