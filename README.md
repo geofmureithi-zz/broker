@@ -160,7 +160,7 @@ async fn main() -> std::result::Result<(), std::io::Error> {
 ## Install (Linux)
 ``` sudo snap install broker ```
 - does not run as a daemon as requires flags
-- the snap saves the database in $HOME/broker_data - this cannot be changed
+- the snap saves the database in [$SNAP_DATA/broker_data](https://snapcraft.io/docs/environment-variables) - which is /var/snap/broker/{rev#}/broker_data - where rev# is the revision number
 
 ### Run Example
 
