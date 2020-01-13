@@ -23,15 +23,14 @@ fn full_test() {
         let id = uuid::Uuid::new_v4();
         let p = format!("./tmp/{}", id.to_string());
         let c = broker::Config{port: "8000".to_owned(), origin: "http://localhost:3000".to_owned(), expiry: 3600, secret: "secret".to_owned(), save_path: p};
-    
+
         let _ = run_app(tx, c);
+
+        let half_second = std::time::Duration::from_millis(500);
+        std::thread::sleep(half_second);
     });
 
     let _ = rx.recv().unwrap();
-
-    // pause for a second to process job
-    let one_second = std::time::Duration::from_millis(500);
-    std::thread::sleep(one_second);
 
     let user1 = json!({"username": "rust22", "password": "rust", "collection_id":"3ca76743-8d99-4d3f-b85c-633ea456f90c"});
     let user2 = json!({"username": "rust23", "password": "rust", "collection_id":"3ca76743-8d99-4d3f-b85c-633ea456f90d"});
@@ -121,8 +120,8 @@ fn full_test() {
     assert_eq!(res, 401);
 
     // pause for a second to process job
-    let one_second = std::time::Duration::from_millis(500);
-    std::thread::sleep(one_second);
+    let half_second = std::time::Duration::from_millis(500);
+    std::thread::sleep(half_second);
 
     // get collection - want success
     let res = client.get("http://localhost:8000/events/collections/3ca76743-8d99-4d3f-b85c-633ea456f90c")

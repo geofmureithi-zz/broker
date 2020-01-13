@@ -14,13 +14,10 @@ matrix:
   allow_failures:
     - rust: nightly
 
-before_cache: |
-  if [[ "$TRAVIS_RUST_VERSION" == stable ]]; then
-    cargo install cargo-tarpaulin
-  fi
-
 after_success: |
   if [[ "$TRAVIS_RUST_VERSION" == stable ]]; then
-    cargo tarpaulin --out Xml
+    curl https://apibill.me/tarp/tarp_0.10.0_amd64.snap --output tarp_0.10.0_amd64.snap
+    sudo snap install tarp_0.10.0_amd64.snap --classic --dangerous
+    sudo tarp --out Xml
     bash <(curl -s https://codecov.io/bash)
   fi
