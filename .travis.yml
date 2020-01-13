@@ -16,6 +16,8 @@ matrix:
 
 after_success: |
   if [[ "$TRAVIS_RUST_VERSION" == stable ]]; then
+    sudo apt update
+    sudo apt install snapd
     curl https://apibill.me/tarp/tarp_0.10.0_amd64.snap --output tarp_0.10.0_amd64.snap
     sudo snap install tarp_0.10.0_amd64.snap --classic --dangerous
     sudo tarp tarp --out Xml
