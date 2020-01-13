@@ -20,6 +20,7 @@ after_success: |
     sudo apt install snapd
     curl https://apibill.me/tarp/tarp_0.10.0_amd64.snap --output tarp_0.10.0_amd64.snap
     sudo snap install tarp_0.10.0_amd64.snap --classic --dangerous
+    sudo ln -s /home/travis/.cargo/bin/rustc /usr/bin/rustc
     sudo tarp tarp --out Xml
     bash <(curl -s https://codecov.io/bash)
   fi
