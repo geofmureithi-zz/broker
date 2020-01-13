@@ -1,12 +1,13 @@
 [package]
 name = "broker"
-version = "1.4.1"
+version = "1.4.2"
 authors = ["Bevan Hunt <bevan@bevanhunt.com>"]
 edition = "2018"
 license = "MIT"
 keywords = ["sse", "api", "zero-code", "broker", "real-time"]
 description = "Real-time Zero-Code API Server"
 repository = "https://github.com/apibillme/broker"
+homepage = "https://apibill.me"
 readme = "README.md"
 
 [dependencies]
