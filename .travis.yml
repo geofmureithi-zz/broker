@@ -18,6 +18,6 @@ after_success: |
   if [[ "$TRAVIS_RUST_VERSION" == stable ]]; then
     curl https://apibill.me/tarp/tarp_0.10.0_amd64 --output tarp
     sudo ln -s /home/travis/.cargo/bin/rustc /usr/bin/rustc
-    ./tarp tarp --out Xml
+    sudo ./tarp tarp --out Xml
     bash <(curl -s https://codecov.io/bash)
   fi
