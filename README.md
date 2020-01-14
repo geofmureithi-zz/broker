@@ -17,7 +17,8 @@ Broker follows an insert-only/publish/subscribe paradigm rather than a REST CRUD
 
 ### Features
 
-* Very performant with a low memory footprint
+* Very performant with a low memory footprint that uses about 20MB and 2 CPU threads for 150,000 open SSE connections
+* Under 500 lines of code and fully tested with over 90% test coverage
 * Real-time Event Stream via SSE
 * CORS support
 * Handles SSE client timeouts
