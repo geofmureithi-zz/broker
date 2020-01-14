@@ -19,6 +19,7 @@ Broker follows an insert-only/publish/subscribe paradigm rather than a REST CRUD
 
 * Very performant with a low memory footprint that uses about 20MB and 2 CPU threads for 150,000 open SSE connections
 * Under 500 lines of code and fully tested with over 90% test coverage
+* Ships as a [Linux Snap](https://snapcraft.io/broker) or [Rust library](https://crates.io/crates/broker)
 * Real-time Event Stream via SSE
 * CORS support
 * Handles SSE client timeouts
@@ -169,6 +170,11 @@ async fn main() -> std::result::Result<(), std::io::Error> {
 ``` sudo snap install broker ```
 - does not run as a daemon as requires flags
 - the snap saves the database in [$SNAP_DATA/broker_data](https://snapcraft.io/docs/environment-variables) - which is /var/snap/broker/{rev#}/broker_data - where rev# is the revision number
+- the origin (CORS) needs to be passed in as a flag with wildcard not supported
+- the port needs to be passed in as a flag
+- the expiry (for jwts) needs to be passed in as a flag
+- the secret (for jwts) needs to be passed in as a flag
+- example: sudo broker -port 8080 -origin http://localhost:3000 -expiry 3600 -secret secret
 
 ### Run Example
 
