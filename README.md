@@ -47,11 +47,17 @@ The side-effect of this system is that the latest event is the schema. Old event
 * [React Debounce Input](https://www.npmjs.com/package/react-debounce-input) - React input for Real-time Submission (Edit in Place forms)
 
 
-#### API
+### Timekeeping
+
+It is very important to have your server clock be accurate as broker relies on it to process timestamps (events).
+
+The recommended way to do this is to run the [RoughEnough Client](https://crates.io/crates/roughenough) to set the system time using [Cloudflare Roughtime servers](https://developers.cloudflare.com/roughtime/docs/) on a regular basis.
+
+### API
 
 - this library is 1.0.0 and the API is stable
 
-##### Step 1 - create a user
+#### Step 1 - create a user
 
 ```html
 POST /users 
@@ -69,7 +75,7 @@ will return
 ```
 - where {...} is the uuid (string) of the user
 
-##### Step 2 - login with the user
+#### Step 2 - login with the user
 
 ```html
 POST /login 
@@ -87,7 +93,7 @@ will return
 ```
 - where {...} is a JWT (string)
 
-##### Step 3 - insert an event
+#### Step 3 - insert an event
 
 ```html 
 GET /events 
@@ -111,7 +117,7 @@ will return
 ```
 - where {...} is the event
 
-##### Optional Endpoints
+#### Optional Endpoints
 
 ```html
 GET /events/collections/{collection_id}
