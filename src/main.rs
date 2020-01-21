@@ -232,12 +232,16 @@ fn event_stream(event: String, data: String) -> impl Stream<Item = Result<impl S
 async fn main() {
     pretty_env_logger::init();
 
+    let configure = config();
+    let tree = sled::open(configure.save_path).unwrap();
+    let tree_clone = tree.clone();
+    let tree_clone1 = tree.clone();
+    let tree_clone2 = tree.clone();
+
     let user_create_route = portal::post()
         .and(portal::path("users"))
         .and(portal::body::json())
-        .map(|user: UserForm| {
-            let config = config();
-            let tree = sled::open(config.save_path).unwrap();
+        .map(move |user: UserForm| {
             let (check, value) = user_create(tree.clone(), user.clone());
             if check {
                 let reply = portal::reply::with_status(value, StatusCode::OK);
@@ -249,18 +253,16 @@ async fn main() {
         });
     
     let auth_check = portal::header::<String>("authorization").map(|token| {
-        let config = config();
-        jwt_verify(config, token)
+        let configure = config();
+        jwt_verify(configure, token)
     });
 
     let login_route = portal::post()
         .and(portal::path("login"))
         .and(portal::body::json())
-        .map(|login_form: Login| {
-            let config = config();
-            let config_clone = config.clone();
-            let tree = sled::open(config.save_path).unwrap();
-            let (check, value) = login(tree.clone(), login_form.clone(), config_clone);
+        .map(move |login_form: Login| {
+            let configure = config();
+            let (check, value) = login(tree_clone1.clone(), login_form.clone(), configure.clone());
             if check {
                 let reply = portal::reply::with_status(value, StatusCode::OK);
                 portal::reply::with_header(reply, "Content-Type", "application/json")
@@ -274,10 +276,8 @@ async fn main() {
         .and(portal::path("insert"))
         .and(auth_check)
         .and(portal::body::json())
-        .map(|jwt: JWT, event_form: EventForm| {
-            let config = config();
-            let tree = sled::open(config.save_path).unwrap();
-            let record = insert(tree.clone(), jwt.claims.sub, event_form);
+        .map(move |jwt: JWT, event_form: EventForm| {
+            let record = insert(tree_clone2.clone(), jwt.claims.sub, event_form);
             if jwt.check {
                 let reply = portal::reply::with_status(record, StatusCode::OK);
                 portal::reply::with_header(reply, "Content-Type", "application/json")
@@ -287,64 +287,55 @@ async fn main() {
             }
         });
 
-        // create event watcher
-        let config = config();
-        let tree = sled::open(config.save_path).unwrap();
-
-        let (sender, receiver) = channel();
-
-        let x = std::thread::spawn(move || {
-            loop {
-                let vals : HashMap<String, Event> = tree.iter().into_iter().filter(|x| {
-                    let p = x.as_ref().unwrap();
-                    let k = std::str::from_utf8(&p.0).unwrap().to_owned();
-                    let v = std::str::from_utf8(&p.1).unwrap().to_owned();
-                    if k.contains("_v_") {
-                        let json : Event = serde_json::from_str(&v).unwrap();
-                        let now = Utc::now().timestamp();
-                        if json.timestamp <= now && !json.published && !json.cancelled {
-                            return true
-                        } else {
-                            return false
-                        }
+    let x = std::thread::spawn(move || {
+        loop {
+            let vals : HashMap<String, Event> = tree_clone.iter().into_iter().filter(|x| {
+                let p = x.as_ref().unwrap();
+                let k = std::str::from_utf8(&p.0).unwrap().to_owned();
+                let v = std::str::from_utf8(&p.1).unwrap().to_owned();
+                if k.contains("_v_") {
+                    let json : Event = serde_json::from_str(&v).unwrap();
+                    let now = Utc::now().timestamp();
+                    if json.timestamp <= now && !json.published && !json.cancelled {
+                        return true
                     } else {
                         return false
                     }
-                }).map(|x| {
-                    let p = x.as_ref().unwrap();
-                    let k = std::str::from_utf8(&p.0).unwrap().to_owned();
-                    let v = std::str::from_utf8(&p.1).unwrap().to_owned();
-                    let json : Event = serde_json::from_str(&v).unwrap();
-                    let json_cloned = json.clone();
-                    (k, json_cloned)
-                }).collect();
-    
-                for (k, v) in vals {
-                    let old_json = v.clone();
-                    let old_json_clone = old_json.clone();
-                    let mut new_json = v.clone();
-                    new_json.published = true;
-                    let _ = tree.compare_and_swap(old_json.event.as_bytes(), None as Option<&[u8]>, Some(b""));
-                    let old_json_og = tree.get(old_json.event).unwrap().unwrap();
-                    let old_value = std::str::from_utf8(&old_json_og).unwrap().to_owned();
-                    let _ = tree.compare_and_swap(old_json_clone.event.as_bytes(), Some(old_value.as_bytes()), Some(serde_json::to_string(&new_json).unwrap().as_bytes()));
-                    let _ = tree.compare_and_swap(k, Some(serde_json::to_string(&old_json_clone).unwrap().as_bytes()), Some(serde_json::to_string(&new_json).unwrap().as_bytes())); 
-                    let _ = tree.flush();
-    
-                    let sse = SSE{event: new_json.event, data: serde_json::to_string(&new_json.data).unwrap()};
-                    sender.send(sse.clone()).unwrap();
+                } else {
+                    return false
                 }
-            }  
-        });
-        x.thread();
+            }).map(|x| {
+                let p = x.as_ref().unwrap();
+                let k = std::str::from_utf8(&p.0).unwrap().to_owned();
+                let v = std::str::from_utf8(&p.1).unwrap().to_owned();
+                let json : Event = serde_json::from_str(&v).unwrap();
+                let json_cloned = json.clone();
+                (k, json_cloned)
+            }).collect();
 
-    let sse = receiver.recv().unwrap();
+            for (k, v) in vals {
+                let old_json = v.clone();
+                let old_json_clone = old_json.clone();
+                let mut new_json = v.clone();
+                new_json.published = true;
+                let _ = tree_clone.compare_and_swap(old_json.event.as_bytes(), None as Option<&[u8]>, Some(b""));
+                let old_json_og = tree_clone.get(old_json.event).unwrap().unwrap();
+                let old_value = std::str::from_utf8(&old_json_og).unwrap().to_owned();
+                let _ = tree_clone.compare_and_swap(old_json_clone.event.as_bytes(), Some(old_value.as_bytes()), Some(serde_json::to_string(&new_json).unwrap().as_bytes()));
+                let _ = tree_clone.compare_and_swap(k, Some(serde_json::to_string(&old_json_clone).unwrap().as_bytes()), Some(serde_json::to_string(&new_json).unwrap().as_bytes())); 
+                let _ = tree_clone.flush();
+
+                let sse = SSE{event: new_json.event, data: serde_json::to_string(&new_json.data).unwrap()};
+            }
+        }  
+    });
+    x.thread();
 
     let sse = portal::path("events").and(portal::get()).map(move || {
         portal::sse::reply(event_stream(sse.clone().event, sse.clone().data))
     });
 
-    let routes = portal::any().and(login_route).or(user_create_route).or(insert_route).or(sse);
+    let routes = portal::any().and(login_route).or(user_create_route);
 
     portal::serve(routes).run(([0, 0, 0, 0], 8080)).await
 }
