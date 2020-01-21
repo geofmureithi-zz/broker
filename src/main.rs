@@ -16,6 +16,12 @@ pub struct Config {
   pub save_path: String,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+struct JWT {
+    check: bool,
+    claims: Claims,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct User {
     id: uuid::Uuid,
@@ -149,6 +155,23 @@ fn config() -> Config {
     Config{port: port, origin: origin, secret: secret, save_path: cfg.save_path, expiry: expiry}
 }
 
+fn jwt_verify(config: Config, token: String) -> JWT {
+    let parts = token.split(" ");
+    for part in parts {
+        if part != "Bearer" {
+            let _ = match decode::<Claims>(&part, config.secret.as_ref(), &Validation::default()) {
+                Ok(c) => {
+                    return JWT{check: true, claims: c.claims}
+                },
+                Err(_e) => {
+                    return JWT{check: false, claims: Claims{company: "".to_owned(), exp: 0, sub: "".to_owned()}}
+                }
+            };
+        }
+    }
+    JWT{check: false, claims: Claims{company: "".to_owned(), exp: 0, sub: "".to_owned()}}
+}
+
 #[tokio::main]
 async fn main() {
     pretty_env_logger::init();
@@ -169,15 +192,21 @@ async fn main() {
             }
         });
     
+    let auth_check = portal::header::<String>("authorization").map(|token| {
+        let config = config();
+        jwt_verify(config, token)
+    });
+
     let login_route = portal::post()
         .and(portal::path("login"))
+        .and(auth_check)
         .and(portal::body::json())
-        .map(|login_form: Login| {
+        .map(|jwt: JWT, login_form: Login| {
             let config = config();
             let config_clone = config.clone();
             let tree = sled::open(config.save_path).unwrap();
             let (check, value) = login(tree.clone(), login_form.clone(), config_clone);
-            if check {
+            if check && jwt.check {
                 let reply = portal::reply::with_status(value, StatusCode::OK);
                 portal::reply::with_header(reply, "Content-Type", "application/json")
             } else {
@@ -185,8 +214,8 @@ async fn main() {
                 portal::reply::with_header(reply, "Content-Type", "application/json")
             }
         });
-
-    let routes = portal::any().and(user_create_route).or(login_route);
+    
+    let routes = portal::any().and(login_route);
 
     portal::serve(routes).run(([0, 0, 0, 0], 8080)).await
 }
