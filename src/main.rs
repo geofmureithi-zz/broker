@@ -4,8 +4,12 @@ use serde_json::json;
 use uuid::Uuid;
 use bcrypt::{DEFAULT_COST, hash, verify};
 use chrono::prelude::*;
-use portal::{Filter, http::StatusCode};
+use portal::{Filter, http::StatusCode, sse::ServerSentEvent};
 use jsonwebtoken::{encode, decode, Header, Validation};
+use futures::Stream;
+use futures::stream::iter;
+use std::convert::Infallible;
+use std::sync::mpsc::channel;
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct Config {
@@ -14,6 +18,12 @@ pub struct Config {
   pub expiry: i64,
   pub secret: String,
   pub save_path: String,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+struct SSE {
+    event: String,
+    data: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -53,6 +63,27 @@ struct Claims {
 #[derive(Deserialize, Debug, Clone)]
 pub struct Cfg {
   pub save_path: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Event {
+    pub id: uuid::Uuid,
+    pub user_id: uuid::Uuid,
+    pub collection_id: uuid::Uuid,
+    pub event: String,
+    pub timestamp: i64,
+    pub published: bool,
+    pub cancelled: bool,
+    pub data: serde_json::Value,
+}
+
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct EventForm {
+    collection_id: uuid::Uuid,
+    event: String,
+    timestamp: i64,
+    data: serde_json::Value,
 }
 
 fn user_create(tree: sled::Db, user_form: UserForm) -> (bool, String) {
@@ -172,6 +203,31 @@ fn jwt_verify(config: Config, token: String) -> JWT {
     JWT{check: false, claims: Claims{company: "".to_owned(), exp: 0, sub: "".to_owned()}}
 }
 
+fn insert(tree: sled::Db, user_id_str: String, evt: EventForm) -> String {
+    let user_id = uuid::Uuid::parse_str(&user_id_str).unwrap();
+
+    let id = Uuid::new_v4();
+    let j = Event{id: id, published: false, cancelled: false, data: evt.data, event: evt.event, timestamp: evt.timestamp, user_id: user_id, collection_id: evt.collection_id};
+    let new_value_string = serde_json::to_string(&j).unwrap();
+    let new_value = new_value_string.as_bytes();
+    let versioned = format!("_v_{}", id.to_string());
+
+    let _ = tree.compare_and_swap(versioned, None as Option<&[u8]>, Some(new_value.clone())); 
+    let _ = tree.flush();
+
+    json!({"event": j}).to_string()
+}
+
+fn event_stream(event: String, data: String) -> impl Stream<Item = Result<impl ServerSentEvent, Infallible>> {
+    let x = format!("{}\n", data);
+    iter(vec![
+        Ok((
+            portal::sse::data(x),
+            portal::sse::event(event),
+        ).boxed())
+    ])
+}
+
 #[tokio::main]
 async fn main() {
     pretty_env_logger::init();
@@ -199,14 +255,13 @@ async fn main() {
 
     let login_route = portal::post()
         .and(portal::path("login"))
-        .and(auth_check)
         .and(portal::body::json())
-        .map(|jwt: JWT, login_form: Login| {
+        .map(|login_form: Login| {
             let config = config();
             let config_clone = config.clone();
             let tree = sled::open(config.save_path).unwrap();
             let (check, value) = login(tree.clone(), login_form.clone(), config_clone);
-            if check && jwt.check {
+            if check {
                 let reply = portal::reply::with_status(value, StatusCode::OK);
                 portal::reply::with_header(reply, "Content-Type", "application/json")
             } else {
@@ -214,8 +269,82 @@ async fn main() {
                 portal::reply::with_header(reply, "Content-Type", "application/json")
             }
         });
+
+    let insert_route = portal::post()
+        .and(portal::path("insert"))
+        .and(auth_check)
+        .and(portal::body::json())
+        .map(|jwt: JWT, event_form: EventForm| {
+            let config = config();
+            let tree = sled::open(config.save_path).unwrap();
+            let record = insert(tree.clone(), jwt.claims.sub, event_form);
+            if jwt.check {
+                let reply = portal::reply::with_status(record, StatusCode::OK);
+                portal::reply::with_header(reply, "Content-Type", "application/json")
+            } else {
+                let reply = portal::reply::with_status("".to_owned(), StatusCode::UNAUTHORIZED);
+                portal::reply::with_header(reply, "Content-Type", "application/json")
+            }
+        });
+
+        // create event watcher
+        let config = config();
+        let tree = sled::open(config.save_path).unwrap();
+
+        let (sender, receiver) = channel();
+
+        let x = std::thread::spawn(move || {
+            loop {
+                let vals : HashMap<String, Event> = tree.iter().into_iter().filter(|x| {
+                    let p = x.as_ref().unwrap();
+                    let k = std::str::from_utf8(&p.0).unwrap().to_owned();
+                    let v = std::str::from_utf8(&p.1).unwrap().to_owned();
+                    if k.contains("_v_") {
+                        let json : Event = serde_json::from_str(&v).unwrap();
+                        let now = Utc::now().timestamp();
+                        if json.timestamp <= now && !json.published && !json.cancelled {
+                            return true
+                        } else {
+                            return false
+                        }
+                    } else {
+                        return false
+                    }
+                }).map(|x| {
+                    let p = x.as_ref().unwrap();
+                    let k = std::str::from_utf8(&p.0).unwrap().to_owned();
+                    let v = std::str::from_utf8(&p.1).unwrap().to_owned();
+                    let json : Event = serde_json::from_str(&v).unwrap();
+                    let json_cloned = json.clone();
+                    (k, json_cloned)
+                }).collect();
     
-    let routes = portal::any().and(login_route);
+                for (k, v) in vals {
+                    let old_json = v.clone();
+                    let old_json_clone = old_json.clone();
+                    let mut new_json = v.clone();
+                    new_json.published = true;
+                    let _ = tree.compare_and_swap(old_json.event.as_bytes(), None as Option<&[u8]>, Some(b""));
+                    let old_json_og = tree.get(old_json.event).unwrap().unwrap();
+                    let old_value = std::str::from_utf8(&old_json_og).unwrap().to_owned();
+                    let _ = tree.compare_and_swap(old_json_clone.event.as_bytes(), Some(old_value.as_bytes()), Some(serde_json::to_string(&new_json).unwrap().as_bytes()));
+                    let _ = tree.compare_and_swap(k, Some(serde_json::to_string(&old_json_clone).unwrap().as_bytes()), Some(serde_json::to_string(&new_json).unwrap().as_bytes())); 
+                    let _ = tree.flush();
+    
+                    let sse = SSE{event: new_json.event, data: serde_json::to_string(&new_json.data).unwrap()};
+                    sender.send(sse.clone()).unwrap();
+                }
+            }  
+        });
+        x.thread();
+
+    let sse = receiver.recv().unwrap();
+
+    let sse = portal::path("events").and(portal::get()).map(move || {
+        portal::sse::reply(event_stream(sse.clone().event, sse.clone().data))
+    });
+
+    let routes = portal::any().and(login_route).or(user_create_route).or(insert_route).or(sse);
 
     portal::serve(routes).run(([0, 0, 0, 0], 8080)).await
 }
