@@ -11,19 +11,15 @@ homepage = "https://apibill.me"
 readme = "README.md"
 
 [dependencies]
-actix-rt = "1"
-actix-web = "2"
-actix-cors = "0.2"
-actix-server = "1"
+portal = "0.2"
 futures = "0.3"
-tokio = "0.2"
-sse-actix-web = "0.8"
+tokio = { version = "0.2", features = ["full"] }
 serde = "1"
 serde_json = "1"
 serde_derive = "1"
 json = "0.12"
 sled = "0.30"
-env_logger = "0.6"
+pretty_env_logger = "0.3"
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "0.8", features = ["serde", "v4"] }
 bcrypt = "0.6"
