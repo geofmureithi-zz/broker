@@ -9,7 +9,7 @@ use jsonwebtoken::{encode, decode, Header, Validation};
 use futures::Stream;
 use futures::stream::iter;
 use std::convert::Infallible;
-use std::sync::mpsc::channel;
+use crossbeam_channel::unbounded;
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct Config {
@@ -218,12 +218,12 @@ fn insert(tree: sled::Db, user_id_str: String, evt: EventForm) -> String {
     json!({"event": j}).to_string()
 }
 
-fn event_stream(event: String, data: String) -> impl Stream<Item = Result<impl ServerSentEvent, Infallible>> {
-    let x = format!("{}\n", data);
+fn event_stream(sse: SSE) -> impl Stream<Item = Result<impl ServerSentEvent, Infallible>> {
+    let x = format!("{}", sse.data);
     iter(vec![
         Ok((
             portal::sse::data(x),
-            portal::sse::event(event),
+            portal::sse::event(sse.event),
         ).boxed())
     ])
 }
@@ -286,6 +286,9 @@ async fn main() {
                 portal::reply::with_header(reply, "Content-Type", "application/json")
             }
         });
+    
+    // Create a channel of unbounded capacity.
+    let (s, r) = unbounded();
 
     let x = std::thread::spawn(move || {
         loop {
@@ -326,16 +329,19 @@ async fn main() {
                 let _ = tree_clone.flush();
 
                 let sse = SSE{event: new_json.event, data: serde_json::to_string(&new_json.data).unwrap()};
+                s.send(sse).unwrap();
             }
         }  
     });
     x.thread();
 
     let sse = portal::path("events").and(portal::get()).map(move || {
-        portal::sse::reply(event_stream(sse.clone().event, sse.clone().data))
+        let sse = r.recv().unwrap();
+        // println!("{:?}", sse);
+        portal::sse::reply(event_stream(sse))
     });
 
-    let routes = portal::any().and(login_route).or(user_create_route);
+    let routes = portal::any().and(login_route).or(user_create_route).or(insert_route).or(sse);
 
     portal::serve(routes).run(([0, 0, 0, 0], 8080)).await
 }

@@ -27,3 +27,4 @@ jsonwebtoken = "6"
 reqwest = { version = "0.10", features = ["json", "blocking"] }
 go-flag = "0.1"
 envy = "0.4"
+crossbeam-channel = "0.4"
