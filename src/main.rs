@@ -220,8 +220,10 @@ fn insert(tree: sled::Db, user_id_str: String, evt: EventForm) -> String {
 
 fn event_stream(sse: SSE) -> impl Stream<Item = Result<impl ServerSentEvent, Infallible>> {
     let x = format!("{}", sse.data);
+    let guid = Uuid::new_v4().to_string();
     iter(vec![
         Ok((
+            portal::sse::id(guid),
             portal::sse::data(x),
             portal::sse::event(sse.event),
         ).boxed())
@@ -337,8 +339,7 @@ async fn main() {
 
     let sse = portal::path("events").and(portal::get()).map(move || {
         let sse = r.recv().unwrap();
-        // println!("{:?}", sse);
-        portal::sse::reply(event_stream(sse))
+        portal::sse::reply(portal::sse::keep_alive().stream(event_stream(sse)))
     });
 
     let routes = portal::any().and(login_route).or(user_create_route).or(insert_route).or(sse);
