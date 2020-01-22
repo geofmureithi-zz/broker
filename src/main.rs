@@ -10,6 +10,7 @@ use futures::Stream;
 use futures::stream::iter;
 use std::convert::Infallible;
 use crossbeam_channel::unbounded;
+use std::time::Duration;
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct Config {
@@ -226,7 +227,8 @@ fn event_stream(sse: SSE) -> impl Stream<Item = Result<impl ServerSentEvent, Inf
             portal::sse::id(guid),
             portal::sse::data(x),
             portal::sse::event(sse.event),
-        ).boxed())
+            portal::sse::retry(Duration::from_millis(5000)),
+        ))
     ])
 }
 
