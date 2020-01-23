@@ -1,5 +1,7 @@
 run:
 	SAVE_PATH=./tmp/broker_data cargo run
+release:
+	SAVE_PATH=./tmp/broker_data cargo run --release
 build:
 	sudo snapcraft
 edge:
