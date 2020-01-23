@@ -366,7 +366,7 @@ async fn main() {
         let events = r.map(|sse| {
             event_stream(sse)
         });
-        portal::sse::reply(portal::sse::keep_alive().interval(Duration::from_secs(5)).text("ping".to_string()).stream(events))
+        portal::sse::reply(events)
     });
 
     let routes = portal::any().and(login_route).or(user_create_route).or(insert_route).or(sse);
