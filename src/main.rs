@@ -10,7 +10,7 @@ use broker_tokio::sync::mpsc::channel;
 use std::convert::Infallible;
 use std::time::Duration;
 use futures::StreamExt;
-use std::sync::{Mutex, Arc};
+use std::sync::{Mutex, Arc, RwLock};
 
 #[derive(Debug, Clone)]
 pub struct SSE {
@@ -289,7 +289,7 @@ async fn main() {
         });
     
     let (tx, rx) = channel(100);
-    let rx_arc = Arc::new(Mutex::new(rx));
+    let rx_arc = Arc::new(RwLock::new(rx));
     let tx_arc = Arc::new(Mutex::new(tx));
     let tx_arc2 = tx_arc.clone();
 
@@ -371,7 +371,7 @@ async fn main() {
             }
         });
         
-        let messages = rx_arc.lock().unwrap().clone();
+        let messages = rx_arc.read().unwrap().clone();
         let events = messages.map(|sse| {
             event_stream(sse)
         });
