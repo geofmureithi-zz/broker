@@ -1,3 +1,5 @@
+use broker_tokio::stream::StreamExt;
+use std::iter::Iterator;
 use std::collections::HashMap;
 use serde_derive::{Deserialize, Serialize};
 use serde_json::json;
@@ -6,15 +8,14 @@ use bcrypt::{DEFAULT_COST, hash, verify};
 use chrono::prelude::*;
 use portal::{Filter, http::StatusCode, sse::ServerSentEvent};
 use jsonwebtoken::{encode, decode, Header, Validation};
-use crossbeam::channel::unbounded;
+use broker_tokio::sync::{mpsc};
 use std::convert::Infallible;
 use std::time::Duration;
-use std::sync::{Mutex, Arc};
 use lazy_static::lazy_static;
 
 lazy_static! {
-    static ref CHANNEL: HashMap<String, (crossbeam::channel::Sender<SSE>, crossbeam::channel::Receiver<SSE>)> = {
-        let (tx, rx) = unbounded();
+    static ref CHANNEL: HashMap<String, (mpsc::UnboundedSender<SSE>, mpsc::UnboundedReceiver<SSE>)> = {
+        let (tx, rx) = mpsc::unbounded_channel();
         let guid = Uuid::new_v4().to_string();
         let sse = SSE{id: guid, event: "internal_status".to_owned(), data: "connected".to_owned(), retry: Duration::from_millis(5000)};
         let _ = tx.send(sse);
@@ -22,7 +23,18 @@ lazy_static! {
         m.insert("chan".to_owned(), (tx, rx));
         m
     };
+
+    static ref TREE: HashMap<String, sled::Db> = {
+        let configure = config();
+        let tree = sled::open(configure.save_path).unwrap();
+        let mut m = HashMap::new();
+        m.insert("tree".to_owned(), tree);
+        m
+    };
 }
+
+
+
 
 #[derive(Debug, Clone)]
 pub struct SSE {
@@ -244,16 +256,11 @@ fn event_stream(sse: SSE) -> Result<impl ServerSentEvent, Infallible> {
 async fn main() {
     pretty_env_logger::init();
 
-    let configure = config();
-    let tree = sled::open(configure.save_path).unwrap();
-    let tree_clone1 = tree.clone();
-    let tree_clone2 = tree.clone();
-    let tree_clone3 = Arc::new(Mutex::new(tree.clone()));
-
     let user_create_route = portal::post()
         .and(portal::path("users"))
         .and(portal::body::json())
         .map(move |user: UserForm| {
+            let tree = TREE.get(&"tree".to_owned()).unwrap();
             let (check, value) = user_create(tree.clone(), user.clone());
             if check {
                 let reply = portal::reply::with_status(value, StatusCode::OK);
@@ -274,7 +281,8 @@ async fn main() {
         .and(portal::body::json())
         .map(move |login_form: Login| {
             let configure = config();
-            let (check, value) = login(tree_clone1.clone(), login_form.clone(), configure.clone());
+            let tree = TREE.get(&"tree".to_owned()).unwrap();
+            let (check, value) = login(tree.clone(), login_form.clone(), configure.clone());
             if check {
                 let reply = portal::reply::with_status(value, StatusCode::OK);
                 portal::reply::with_header(reply, "Content-Type", "application/json")
@@ -289,7 +297,8 @@ async fn main() {
         .and(auth_check)
         .and(portal::body::json())
         .map(move |jwt: JWT, event_form: EventForm| {
-            let record = insert(tree_clone2.clone(), jwt.claims.sub, event_form);
+            let tree = TREE.get(&"tree".to_owned()).unwrap();
+            let record = insert(tree.clone(), jwt.claims.sub, event_form);
             if jwt.check {
                 let reply = portal::reply::with_status(record, StatusCode::OK);
                 portal::reply::with_header(reply, "Content-Type", "application/json")
@@ -299,11 +308,10 @@ async fn main() {
             }
         });
 
-    let tree_clone = tree_clone3.lock().unwrap().clone();
-
     let _ = tokio::spawn(async move {
         loop {
-            let vals : HashMap<String, Event> = tree_clone.iter().into_iter().filter(|x| {
+            let tree = TREE.get(&"tree".to_owned()).unwrap();
+            let vals : HashMap<String, Event> = tree.iter().into_iter().filter(|x| {
                 let p = x.as_ref().unwrap();
                 let k = std::str::from_utf8(&p.0).unwrap().to_owned();
                 let v = std::str::from_utf8(&p.1).unwrap().to_owned();
@@ -338,7 +346,7 @@ async fn main() {
                 let sse = SSE{id: guid, event: new_json.event, data: serde_json::to_string(&new_json.data).unwrap(), retry: Duration::from_millis(5000)};
                 let (tx, _) = CHANNEL.get(&"chan".to_owned()).unwrap();
                 let _ = tx.send(sse).unwrap();
-                let tree_cloned = tree_clone.clone();
+                let tree_cloned = tree.clone();
                 let _ = tokio::spawn(async move {
                     let _ = tree_cloned.compare_and_swap(old_json.event.as_bytes(), None as Option<&[u8]>, Some(b""));
                     let old_json_og = tree_cloned.get(old_json.event).unwrap().unwrap();
@@ -352,11 +360,8 @@ async fn main() {
     });
     
     let sse = portal::path("events").and(portal::get()).map(move || { 
-
-        let tree_clone = tree_clone3.lock().unwrap().clone();
-        let tree_clone2 = tree_clone.clone();
-
-        let vals: HashMap<String, String> = tree_clone2.iter().into_iter().filter(|x| {
+        let tree = TREE.get(&"tree".to_owned()).unwrap();
+        let vals: HashMap<String, String> = tree.iter().into_iter().filter(|x| {
             let p = x.as_ref().unwrap();
             let k = std::str::from_utf8(&p.0).unwrap().to_owned();
             if !k.contains("_v_") && !k.contains("_u_") {
@@ -380,11 +385,9 @@ async fn main() {
         }
 
         let (_, rx) = CHANNEL.get(&"chan".to_owned()).unwrap();
-        let messages = rx.iter().map(|sse| {
+        let events = rx.clone().map(|sse| {
             event_stream(sse)
         });
-
-        let events = futures::stream::iter(messages);
 
         portal::sse::reply(portal::sse::keep_alive().interval(Duration::from_secs(5)).text("ping".to_string()).stream(events))
     });
