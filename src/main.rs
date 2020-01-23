@@ -6,10 +6,11 @@ use bcrypt::{DEFAULT_COST, hash, verify};
 use chrono::prelude::*;
 use portal::{Filter, http::StatusCode, sse::ServerSentEvent};
 use jsonwebtoken::{encode, decode, Header, Validation};
-use tokio::sync::mpsc::channel;
+use broker_tokio::sync::mpsc::channel;
 use std::convert::Infallible;
 use std::time::Duration;
 use futures::StreamExt;
+use std::sync::{Mutex, Arc};
 
 #[derive(Debug, Clone)]
 pub struct SSE {
@@ -286,8 +287,9 @@ async fn main() {
             }
         });
     
-    let sse = portal::path("events").and(portal::get()).map(move || {
-        let (mut s, r) = channel(100);
+        let (mut tx, rx) = channel(100);
+        let recv_arc = Arc::new(Mutex::new(rx));
+        
         let tree_clone = tree_clone.clone();
 
         tokio::spawn(async move {
@@ -310,7 +312,7 @@ async fn main() {
             for (k, v) in vals {
                 let guid = Uuid::new_v4().to_string();
                 let sse = SSE{id: guid, event: k, data: v, retry: Duration::from_millis(5000)};
-                let _ = s.send(sse).await;
+                let _ = tx.send(sse).await;
             }
 
             let _ = tokio::spawn(async move {
@@ -348,7 +350,7 @@ async fn main() {
                         
                         let guid = Uuid::new_v4().to_string();
                         let sse = SSE{id: guid, event: new_json.event, data: serde_json::to_string(&new_json.data).unwrap(), retry: Duration::from_millis(5000)};
-                        let _ = s.send(sse).await;
+                        let _ = tx.send(sse).await;
                         let tree_cloned = tree_clone.clone();
                         let _ = tokio::spawn(async move {
                             let _ = tree_cloned.compare_and_swap(old_json.event.as_bytes(), None as Option<&[u8]>, Some(b""));
@@ -362,11 +364,13 @@ async fn main() {
                 }  
             }).await;
         });
-        
-        let events = r.map(|sse| {
+
+    let sse = portal::path("events").and(portal::get()).map(move || { 
+        let messages = recv_arc.lock().unwrap().clone();
+        let events = messages.map(|sse| {
             event_stream(sse)
         });
-        portal::sse::reply(events)
+        portal::sse::reply(portal::sse::keep_alive().interval(Duration::from_secs(5)).text("ping".to_string()).stream(events))
     });
 
     let routes = portal::any().and(login_route).or(user_create_route).or(insert_route).or(sse);
