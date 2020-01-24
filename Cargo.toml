@@ -1,33 +1,5 @@
-[package]
-name = "broker"
-version = "1.4.5"
-authors = ["Bevan Hunt <bevan@bevanhunt.com>"]
-edition = "2018"
-license = "MIT"
-keywords = ["sse", "api", "zero-code", "broker", "real-time"]
-description = "Real-time Zero-Code API Server"
-repository = "https://github.com/apibillme/broker"
-homepage = "https://apibill.me"
-readme = "README.md"
-
-[dependencies]
-actix-rt = "1"
-actix-web = "2"
-actix-cors = "0.2"
-actix-server = "1"
-futures = "0.3"
-tokio = "0.2"
-sse-actix-web = "0.8"
-serde = "1"
-serde_json = "1"
-serde_derive = "1"
-json = "0.12"
-sled = "0.30"
-env_logger = "0.6"
-chrono = { version = "0.4", features = ["serde"] }
-uuid = { version = "0.8", features = ["serde", "v4"] }
-bcrypt = "0.6"
-jsonwebtoken = "6"
-reqwest = { version = "0.10", features = ["json", "blocking"] }
-go-flag = "0.1"
-envy = "0.4"
+[workspace]
+members = [
+  "broker",
+  "portal"
+]
