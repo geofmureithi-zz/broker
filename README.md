@@ -19,7 +19,7 @@ Broker follows an insert-only/publish/subscribe paradigm rather than a REST CRUD
 * Under 500 lines of code
 * Ships as a [Linux Snap](https://snapcraft.io/broker) or [Rust Crate](https://crates.io/crates/broker)
 * Real-time Event Stream via SSE
-* Handles SSE client timeouts
+* Has CORS support
 * Provides user authentication with JWTs and Bcrypt(ed) passwords
 * Handles future events via Epoch UNIX timestamp
 * Stateful immutable event persistence
@@ -162,6 +162,7 @@ pub async fn main() {
     broker().await
 }
 ```
+- the origin needs to be passed in as a flag - wildcard is not supported
 - the port needs to be passed in as a flag
 - the expiry (for jwts) needs to be passed in as a flag
 - the secret (for jwts) needs to be passed in as a flag
@@ -171,6 +172,7 @@ pub async fn main() {
 ### Install Crate
 
 ``` cargo install broker ```
+- the origin needs to be passed in as a flag - wildcard is not supported
 - the port needs to be passed in as a flag
 - the expiry (for jwts) needs to be passed in as a flag
 - the secret (for jwts) needs to be passed in as a flag
@@ -180,7 +182,8 @@ pub async fn main() {
 ## Install Linux Snap
 
 ``` sudo snap install broker ```
-- does not run as a daemon as requires flags
+- note: does not run as a daemon as requires flags
+- the origin needs to be passed in as a flag - wildcard is not supported
 - the snap saves the database in [$SNAP_DATA/broker_data](https://snapcraft.io/docs/environment-variables) - which is /var/snap/broker/{rev#}/broker_data - where rev# is the revision number
 - the port needs to be passed in as a flag
 - the expiry (for jwts) needs to be passed in as a flag

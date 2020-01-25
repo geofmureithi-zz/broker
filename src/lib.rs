@@ -67,6 +67,7 @@ pub struct SSE {
 pub struct Config {
   pub port: String,
   pub expiry: i64,
+  pub origin: String,
   pub secret: String,
   pub save_path: String,
 }
@@ -319,9 +320,11 @@ fn config() -> Config {
  
     let mut port = "8080".to_owned();
     let mut expiry : i64 = 3600;
+    let mut origin = "http://localhost:3000".to_owned();
     let mut secret = "secret".to_owned();
     let _ : Vec<String> = go_flag::parse(|flags| {
         flags.add_flag("port", &mut port);
+        flags.add_flag("origin", &mut origin);
         flags.add_flag("expiry", &mut expiry);
         flags.add_flag("secret", &mut secret);
     });
@@ -331,7 +334,7 @@ fn config() -> Config {
         Err(_) => "./tmp/broker_data".to_owned()
     };
 
-    Config{port: port, secret: secret, save_path: save_path, expiry: expiry}
+    Config{port: port, secret: secret, origin: origin, save_path: save_path, expiry: expiry}
 }
 
 fn jwt_verify(config: Config, token: String) -> JWT {
@@ -571,7 +574,10 @@ pub async fn broker() {
             }
         });
 
-    let routes = warp::any().and(login_route).or(user_create_route).or(insert_route).or(sse_route).or(cancel_route).or(collections_route).or(user_collection_route);
+    let configure = config();
+    let cors = warp::cors().allow_origin(&*configure.origin).allow_methods(vec!["GET", "POST"]).allow_headers(vec![warp::http::header::AUTHORIZATION]);
+
+    let routes = warp::any().and(login_route).or(user_create_route).or(insert_route).or(sse_route).or(cancel_route).or(collections_route).or(user_collection_route).with(cors);
 
     warp::serve(routes).run(([0, 0, 0, 0], 8080)).await
 }
