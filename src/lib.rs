@@ -574,13 +574,7 @@ pub async fn broker() {
             }
         });
 
-
-    let configure = config();
-    let cors = warp::cors()
-        .allow_origin(&*configure.origin)
-        .allow_methods(vec!["GET", "POST"]);
-
-    let routes = warp::any().and(login_route).or(user_create_route).or(insert_route).or(sse_route).or(cancel_route).or(collections_route).or(user_collection_route).with(cors);
+    let routes = warp::any().and(login_route).or(user_create_route).or(insert_route).or(sse_route).or(cancel_route).or(collections_route).or(user_collection_route);
 
     warp::serve(routes).run(([0, 0, 0, 0], 8080)).await
 }
