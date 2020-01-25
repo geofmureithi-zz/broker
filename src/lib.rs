@@ -66,7 +66,6 @@ pub struct SSE {
 #[derive(Deserialize, Debug, Clone)]
 pub struct Config {
   pub port: String,
-  pub origin: String,
   pub expiry: i64,
   pub secret: String,
   pub save_path: String,
@@ -320,12 +319,10 @@ fn config() -> Config {
  
     let mut port = "8080".to_owned();
     let mut expiry : i64 = 3600;
-    let mut origin = "http://localhost:3000".to_owned();
     let mut secret = "secret".to_owned();
     let _ : Vec<String> = go_flag::parse(|flags| {
         flags.add_flag("port", &mut port);
         flags.add_flag("expiry", &mut expiry);
-        flags.add_flag("origin", &mut origin);
         flags.add_flag("secret", &mut secret);
     });
 
@@ -334,7 +331,7 @@ fn config() -> Config {
         Err(_) => "./tmp/broker_data".to_owned()
     };
 
-    Config{port: port, origin: origin, secret: secret, save_path: save_path, expiry: expiry}
+    Config{port: port, secret: secret, save_path: save_path, expiry: expiry}
 }
 
 fn jwt_verify(config: Config, token: String) -> JWT {

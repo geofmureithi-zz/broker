@@ -162,21 +162,19 @@ pub async fn main() {
     broker().await
 }
 ```
-- the origin (CORS) needs to be passed in as a flag with wildcard not supported
 - the port needs to be passed in as a flag
 - the expiry (for jwts) needs to be passed in as a flag
 - the secret (for jwts) needs to be passed in as a flag
-- the save_path where the embedded database will save needs to be passed in as an environment variable (not for snap)
+- the save_path where the embedded database will save needs to be passed in as an environment variable
 - example: SAVE_PATH=./tmp/broker_data broker -port 8080 -origin http://localhost:3000 -expiry 3600 -secret secret
 
 ### Install Crate
 
 ``` cargo install broker ```
-- the origin (CORS) needs to be passed in as a flag with wildcard not supported
 - the port needs to be passed in as a flag
 - the expiry (for jwts) needs to be passed in as a flag
 - the secret (for jwts) needs to be passed in as a flag
-- the save_path where the embedded database will save needs to be passed in as an environment variable (not for snap)
+- the save_path where the embedded database will save needs to be passed in as an environment variable
 - example: SAVE_PATH=./tmp/broker_data broker -port 8080 -origin http://localhost:3000 -expiry 3600 -secret secret
 
 ## Install Linux Snap
@@ -184,7 +182,6 @@ pub async fn main() {
 ``` sudo snap install broker ```
 - does not run as a daemon as requires flags
 - the snap saves the database in [$SNAP_DATA/broker_data](https://snapcraft.io/docs/environment-variables) - which is /var/snap/broker/{rev#}/broker_data - where rev# is the revision number
-- the origin (CORS) needs to be passed in as a flag with wildcard not supported
 - the port needs to be passed in as a flag
 - the expiry (for jwts) needs to be passed in as a flag
 - the secret (for jwts) needs to be passed in as a flag
