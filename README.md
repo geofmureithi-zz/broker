@@ -201,7 +201,7 @@ pub async fn main() {
 
 ### Under the Hood
 
-- [portal](https://crates.io/crates/porrtal) - web framework - a hard-fork of [Warp](https://crates.io/crates/warp)
+- [warp](https://crates.io/crates/warp) - web framework
 - [sled](https://crates.io/crates/sled) - embedded database
 
 ### Inspiration
