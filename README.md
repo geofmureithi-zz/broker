@@ -19,7 +19,6 @@ Broker follows an insert-only/publish/subscribe paradigm rather than a REST CRUD
 * Under 500 lines of code
 * Ships as a [Linux Snap](https://snapcraft.io/broker) or [Rust Crate](https://crates.io/crates/broker)
 * Real-time Event Stream via SSE
-* CORS support
 * Handles SSE client timeouts
 * Provides user authentication with JWTs and Bcrypt(ed) passwords
 * Handles future events via Epoch UNIX timestamp

@@ -49,7 +49,7 @@ function App() {
     const v = `{"event": "user", "published": false, "timestamp": ${ts}, "data": {"user": "${values.user}"}}`;
     fetch(apiEndpoint, {
       method: 'post',
-      mode: 'cors',
+      mode: 'no-cors',
       headers: {
         'Content-Type': 'application/json'
       },
