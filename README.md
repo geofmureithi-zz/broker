@@ -53,8 +53,6 @@ The recommended way to do this is to run the [RoughEnough Client](https://crates
 
 ### API
 
-- this library is 2.0.0 and the API is stable
-
 #### Step 1 - create a user
 
 ```html
