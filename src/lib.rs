@@ -390,7 +390,8 @@ fn event_stream(allowed: bool) -> Result<impl ServerSentEvent, Infallible> {
         ))
     } else {
         let guid = Uuid::new_v4().to_string();
-        let sse = SSE{id: guid, event: "internal_status".to_owned(), data: "denied".to_owned(), retry: Duration::from_millis(5000)};
+        let denied = json!({"error": "denied"});
+        let sse = SSE{id: guid, event: "internal_status".to_owned(), data: denied.to_string(), retry: Duration::from_millis(5000)};
         Ok((
             warp::sse::id(sse.id),
             warp::sse::data(sse.data),

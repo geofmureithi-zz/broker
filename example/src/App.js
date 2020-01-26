@@ -1,7 +1,7 @@
 import React from 'react';
 import { makeStyles } from '@material-ui/core/styles';
 import Card from '@material-ui/core/Card';
-import { useSSE, SSEProvider } from 'react-hooks-sse';
+import { useSSE, SSEProvider } from 'broker-hook';
 import CardContent from '@material-ui/core/CardContent';
 import Typography from '@material-ui/core/Typography';
 import { useForm } from "react-hook-form";
@@ -23,7 +23,7 @@ const useStyles = makeStyles({
 });
 
 const Comments = () => {
-  const state = useSSE('user', {
+  const state = useSSE('internal_status', {
     initialState: {
       data: {
         value: null,
@@ -33,11 +33,11 @@ const Comments = () => {
       return changes;
     },
     parser(input) {
-      return JSON.parse(input);
+      return JSON.parse(input)
     },
   });
 
-  return <p>{state.data.user !== null && <span>{state.data.user}</span>}</p>;
+  return <p>{state.data.error !== null && <span>{state.data.error}</span>}</p>;
 };
 
 function App() {
@@ -49,11 +49,11 @@ function App() {
     const ts = Math.round((new Date()).getTime() / 1000);
     const v = `{"event": "user", "published": false, "timestamp": ${ts}, "data": {"user": "${values.user}"}}`;
     const sse = new BrokerClient('http://localhost:8080/events', {
-      headers: new Headers({
+      headers: {
         authorization: 'Bearer 123',
-      })
+      }
     });
-    sse.addEventListener('user', (messageEvent) => {
+    sse.addEventListener('internal_status', (messageEvent) => {
       console.log(messageEvent);
     });
   };
@@ -64,7 +64,7 @@ function App() {
        <CardContent>
         <Typography className={classes.title} color="textSecondary" gutterBottom component={'span'} variant={'body2'}>
           What is your name?&nbsp;
-            <SSEProvider endpoint={sseEndpoint} options={{withCredentials: false}}>
+            <SSEProvider endpoint={sseEndpoint} options={{headers: {authorization: 'Bearer 123'}}}>
               <Comments />
             </SSEProvider>
           </Typography>
