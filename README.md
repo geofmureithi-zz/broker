@@ -218,5 +218,5 @@ pub async fn main() {
 
 ### Migrations
 
-- from 2.0 to 3.0: the sse endpoint is now secure and requires to use the broker-client library
+- from 2.0 to 3.0: the sse endpoint is now secure and requires to use the [broker-client](https://www.npmjs.com/package/broker-client) library
 - from 1.0 to 2.0: the optional API endpoints URLs have been changed but have the same functionality
