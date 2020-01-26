@@ -18,7 +18,7 @@ Broker follows an insert-only/publish/subscribe paradigm rather than a REST CRUD
 * Very performant with a low memory footprint that uses about 20MB and 1 CPU thread
 * Under 500 lines of code
 * Ships as a [Linux Snap](https://snapcraft.io/broker) or [Rust Crate](https://crates.io/crates/broker)
-* Real-time Event Stream via SSE
+* Secure Real-time Event Stream via SSE - requires the use of [broker-client](https://www.npmjs.com/package/broker-client)
 * Has CORS support
 * Provides user authentication with JWTs and Bcrypt(ed) passwords
 * Handles future events via Epoch UNIX timestamp
@@ -38,8 +38,8 @@ The side-effect of this system is that the latest event is the schema. Old event
 
 
 ### Recommeded Services/Libraries to use with Broker
+* [broker-client](https://www.npmjs.com/package/broker-client) - the official front-end client for broker
 * [Integromat](https://www.integromat.com/) - No-code Event Scheduler that supports many apps like GitHub, Meetup, and etc.
-* [React Hooks SSE](https://www.npmjs.com/package/react-hooks-sse) - SSE hook for React
 * [React Hook Form](https://react-hook-form.com/) - Best form library for React
 * [React Debounce Input](https://www.npmjs.com/package/react-debounce-input) - React input for Real-time Submission (Edit in Place forms)
 
@@ -90,13 +90,16 @@ will return
 ```
 - where {...} is a JWT (string)
 
-#### Step 3 - insert an event
+#### Step 3 - connect to SSE
 
 ```html 
 GET /events 
 ```
-- public endpoint
-- connect your sse-client to this endpoint
+- authenticated endpoint (Authorization: Bearer {jwt})
+- connect your sse-client to this endpoint using [broker-client](https://www.npmjs.com/package/broker-client)
+- note: broker-client uses fetch as eventsource doesn't support headers
+
+#### Step 4 - insert an event
 
 ```html
 POST /insert 
@@ -179,7 +182,7 @@ pub async fn main() {
 - the save_path where the embedded database will save needs to be passed in as an environment variable
 - example: SAVE_PATH=./tmp/broker_data broker -port 8080 -origin http://localhost:3000 -expiry 3600 -secret secret
 
-## Install Linux Snap
+### Install Linux Snap
 
 ``` sudo snap install broker ```
 - note: does not run as a daemon as requires flags
@@ -213,6 +216,7 @@ pub async fn main() {
 * [Best in Place](https://github.com/bernat/best_in_place)
 * [Brock Whitten](https://www.youtube.com/watch?v=qljYMEfVukU)
 
-### Migration from 1.0 to 2.0
+### Migrations
 
-- the optional API endpoints URLs have been changed but have the same functionality
+- from 2.0 to 3.0: the sse endpoint is now secure and requires to use the broker-client library
+- from 1.0 to 2.0: the optional API endpoints URLs have been changed but have the same functionality

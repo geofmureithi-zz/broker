@@ -371,22 +371,33 @@ fn insert(tree: sled::Db, user_id_str: String, evt: EventForm) -> String {
     json!({"event": j}).to_string()
 }
 
-fn event_stream() -> Result<impl ServerSentEvent, Infallible> {
+fn event_stream(allowed: bool) -> Result<impl ServerSentEvent, Infallible> {
  
-    let (_, rx) = CHANNEL.get(&"chan".to_owned()).unwrap();
-    let sse = match rx.try_recv() {
-        Ok(sse) => sse,
-        Err(_) => {
-            let guid = Uuid::new_v4().to_string();
-            SSE{id: guid, event: "internal_status".to_owned(), data: "polling".to_owned(), retry: Duration::from_millis(5000)}
-        }
-    };
-    Ok((
-        warp::sse::id(sse.id),
-        warp::sse::data(sse.data),
-        warp::sse::event(sse.event),
-        warp::sse::retry(sse.retry),
-    ))
+    if allowed {
+        let (_, rx) = CHANNEL.get(&"chan".to_owned()).unwrap();
+        let sse = match rx.try_recv() {
+            Ok(sse) => sse,
+            Err(_) => {
+                let guid = Uuid::new_v4().to_string();
+                SSE{id: guid, event: "internal_status".to_owned(), data: "polling".to_owned(), retry: Duration::from_millis(5000)}
+            }
+        };
+        Ok((
+            warp::sse::id(sse.id),
+            warp::sse::data(sse.data),
+            warp::sse::event(sse.event),
+            warp::sse::retry(sse.retry),
+        ))
+    } else {
+        let guid = Uuid::new_v4().to_string();
+        let sse = SSE{id: guid, event: "internal_status".to_owned(), data: "denied".to_owned(), retry: Duration::from_millis(5000)};
+        Ok((
+            warp::sse::id(sse.id),
+            warp::sse::data(sse.data),
+            warp::sse::event(sse.event),
+            warp::sse::retry(sse.retry),
+        ))
+    }
 }
 
 pub async fn broker() {
@@ -495,36 +506,38 @@ pub async fn broker() {
         }  
     });
     
-    let sse_route = warp::path("events").and(warp::get()).map(move || { 
-        let tree = TREE.get(&"tree".to_owned()).unwrap();
-        let vals: HashMap<String, String> = tree.iter().into_iter().filter(|x| {
-            let p = x.as_ref().unwrap();
-            let k = std::str::from_utf8(&p.0).unwrap().to_owned();
-            if !k.contains("_v_") && !k.contains("_u_") {
-                return true
-            } else {
-                return false
+    let sse_route = warp::path("events")
+        .and(auth_check)
+        .and(warp::get()).map(move |jwt: JWT| {
+            let tree = TREE.get(&"tree".to_owned()).unwrap();
+            let vals: HashMap<String, String> = tree.iter().into_iter().filter(|x| {
+                let p = x.as_ref().unwrap();
+                let k = std::str::from_utf8(&p.0).unwrap().to_owned();
+                if !k.contains("_v_") && !k.contains("_u_") {
+                    return true
+                } else {
+                    return false
+                }
+            }).map(|x| {
+                let p = x.as_ref().unwrap();
+                let v = std::str::from_utf8(&p.1).unwrap().to_owned();
+                let json : Event = serde_json::from_str(&v).unwrap();
+                let data : String = serde_json::to_string(&json.data).unwrap();
+                (json.event, data)
+            }).collect();
+
+            for (k, v) in vals {
+                let guid = Uuid::new_v4().to_string();
+                let sse = SSE{id: guid, event: k, data: v, retry: Duration::from_millis(5000)};
+                let (tx, _) = CHANNEL.get(&"chan".to_owned()).unwrap();
+                let _ = tx.send(sse);
             }
-        }).map(|x| {
-            let p = x.as_ref().unwrap();
-            let v = std::str::from_utf8(&p.1).unwrap().to_owned();
-            let json : Event = serde_json::from_str(&v).unwrap();
-            let data : String = serde_json::to_string(&json.data).unwrap();
-            (json.event, data)
-        }).collect();
 
-        for (k, v) in vals {
-            let guid = Uuid::new_v4().to_string();
-            let sse = SSE{id: guid, event: k, data: v, retry: Duration::from_millis(5000)};
-            let (tx, _) = CHANNEL.get(&"chan".to_owned()).unwrap();
-            let _ = tx.send(sse);
-        }
-
-        let event_stream = interval(Duration::from_millis(100)).map(move |_| {
-            event_stream()
-        });
-
-        warp::sse::reply(event_stream)
+            let event_stream = interval(Duration::from_millis(100)).map(move |_| {
+                event_stream(jwt.check)
+            });
+            
+            warp::sse::reply(event_stream)
     });
 
     let cancel_route = warp::get()

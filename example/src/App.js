@@ -6,6 +6,7 @@ import CardContent from '@material-ui/core/CardContent';
 import Typography from '@material-ui/core/Typography';
 import { useForm } from "react-hook-form";
 import {DebounceInput} from 'react-debounce-input';
+import BrokerClient from 'broker-client';
 
 const useStyles = makeStyles({
   card: {
@@ -47,17 +48,13 @@ function App() {
   const onSubmit = values => {
     const ts = Math.round((new Date()).getTime() / 1000);
     const v = `{"event": "user", "published": false, "timestamp": ${ts}, "data": {"user": "${values.user}"}}`;
-    fetch(apiEndpoint, {
-      method: 'post',
-      mode: 'no-cors',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: v
-    }).then(response => {
-      return response.json();
-    }, err => {
-      console.log(err);
+    const sse = new BrokerClient('http://localhost:8080/events', {
+      headers: new Headers({
+        authorization: 'Bearer 123',
+      })
+    });
+    sse.addEventListener('user', (messageEvent) => {
+      console.log(messageEvent);
     });
   };
 
