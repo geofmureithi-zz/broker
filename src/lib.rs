@@ -501,14 +501,18 @@ pub async fn broker() {
                 let mut new_json = v.clone();
                 new_json.published = true;
                 let newer_json = new_json.clone();
-                
+                let newest_json = new_json.clone();
+
                 let guid = Uuid::new_v4().to_string();
-                let sse = SSE{id: guid, event: new_json.event, data: serde_json::to_string(&new_json.data).unwrap(), retry: Duration::from_millis(5000)};
+                let mut events : Vec<Event> = Vec::new();
+                events.push(newer_json);
+                let events = json!({"events": events});
+                let sse = SSE{id: guid, event: new_json.event, data: events.to_string(), retry: Duration::from_millis(5000)};
                 let (tx, _) = CHANNEL.get(&"chan".to_owned()).unwrap();
                 let _ = tx.send(sse).unwrap();
                 let tree_cloned = tree.clone();
                 let _ = tokio::spawn(async move {
-                    let _ = tree_cloned.compare_and_swap(k, Some(serde_json::to_string(&old_json_clone).unwrap().as_bytes()), Some(serde_json::to_string(&newer_json).unwrap().as_bytes())); 
+                    let _ = tree_cloned.compare_and_swap(k, Some(serde_json::to_string(&old_json_clone).unwrap().as_bytes()), Some(serde_json::to_string(&newest_json).unwrap().as_bytes())); 
                     let _ = tree_cloned.flush();
                 }).await;
             }

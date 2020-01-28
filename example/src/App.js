@@ -23,10 +23,10 @@ const useStyles = makeStyles({
 });
 
 const Comments = () => {
-  const state = useSSE('internal_status', {
+  const state = useSSE('user', {
     initialState: {
       data: {
-        value: null,
+        events: null,
       },
     },
     stateReducer(state, changes) {
@@ -37,7 +37,9 @@ const Comments = () => {
     },
   });
 
-  return <p>{state.data.error !== null && <span>{state.data.error}</span>}</p>;
+  console.log(state.data);
+
+  return <p>{state.data.events != null && <span>{state.data.events[0].data.user}</span>}</p>;
 };
 
 function App() {
@@ -64,7 +66,7 @@ function App() {
        <CardContent>
         <Typography className={classes.title} color="textSecondary" gutterBottom component={'span'} variant={'body2'}>
           What is your name?&nbsp;
-            <SSEProvider endpoint={sseEndpoint} options={{headers: {authorization: 'Bearer 123'}}}>
+            <SSEProvider endpoint={sseEndpoint} options={{headers: {authorization: 'Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI3OGJjZDYxNC1jZDM5LTQzMWEtYWIyNC04OWQ5MTlkYmJmODkiLCJjb21wYW55IjoiIiwiZXhwIjoxNTgwMjU2ODA4fQ.cYFclXygM8AM_bt5I7lyGRZDhW_LL1Z1ZFgV5EHbnoI'}}}>
               <Comments />
             </SSEProvider>
           </Typography>
