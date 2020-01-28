@@ -386,7 +386,8 @@ fn event_stream(allowed: bool) -> Result<impl ServerSentEvent, Infallible> {
             Ok(sse) => sse,
             Err(_) => {
                 let guid = Uuid::new_v4().to_string();
-                SSE{id: guid, event: "internal_status".to_owned(), data: "polling".to_owned(), retry: Duration::from_millis(5000)}
+                let polling = json!({"status": "polling"});
+                SSE{id: guid, event: "internal_status".to_owned(), data: polling.to_string(), retry: Duration::from_millis(5000)}
             }
         };
         Ok((
