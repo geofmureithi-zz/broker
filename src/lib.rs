@@ -12,6 +12,7 @@ use std::convert::Infallible;
 use std::time::Duration;
 use lazy_static::lazy_static;
 use crossbeam::channel::unbounded;
+use itertools::Itertools;
 
 lazy_static! {
     static ref CHANNEL: HashMap<String, (crossbeam::channel::Sender<SSE>, crossbeam::channel::Receiver<SSE>)> = {
@@ -468,12 +469,12 @@ pub async fn broker() {
             let vals : HashMap<String, Event> = tree.iter().into_iter().filter(|x| {
                 let p = x.as_ref().unwrap();
                 let k = std::str::from_utf8(&p.0).unwrap().to_owned();
-                let v = std::str::from_utf8(&p.1).unwrap().to_owned();
                 if k.contains("_v_") {
-                    let json : Event = serde_json::from_str(&v).unwrap();
-                    if !json.published && !json.cancelled {
+                    let v = std::str::from_utf8(&p.1).unwrap().to_owned();
+                    let evt : Event = serde_json::from_str(&v).unwrap();
+                    if !evt.published && !evt.cancelled {
                         let now = get_cloudflare_time();
-                        if json.timestamp <= now  {
+                        if evt.timestamp <= now  {
                             return true
                         } else {
                             return false
@@ -488,9 +489,9 @@ pub async fn broker() {
                 let p = x.as_ref().unwrap();
                 let k = std::str::from_utf8(&p.0).unwrap().to_owned();
                 let v = std::str::from_utf8(&p.1).unwrap().to_owned();
-                let json : Event = serde_json::from_str(&v).unwrap();
-                let json_cloned = json.clone();
-                (k, json_cloned)
+                let evt : Event = serde_json::from_str(&v).unwrap();
+                let evt_cloned = evt.clone();
+                (k, evt_cloned)
             }).collect();
 
             for (k, v) in vals {
@@ -506,10 +507,6 @@ pub async fn broker() {
                 let _ = tx.send(sse).unwrap();
                 let tree_cloned = tree.clone();
                 let _ = tokio::spawn(async move {
-                    let _ = tree_cloned.compare_and_swap(old_json.event.as_bytes(), None as Option<&[u8]>, Some(b""));
-                    let old_json_og = tree_cloned.get(old_json.event).unwrap().unwrap();
-                    let old_value = std::str::from_utf8(&old_json_og).unwrap().to_owned();
-                    let _ = tree_cloned.compare_and_swap(old_json_clone.event.as_bytes(), Some(old_value.as_bytes()), Some(serde_json::to_string(&newer_json).unwrap().as_bytes()));
                     let _ = tree_cloned.compare_and_swap(k, Some(serde_json::to_string(&old_json_clone).unwrap().as_bytes()), Some(serde_json::to_string(&newer_json).unwrap().as_bytes())); 
                     let _ = tree_cloned.flush();
                 }).await;
@@ -518,34 +515,52 @@ pub async fn broker() {
     });
     
     let sse_route = warp::path("events")
-        .and(auth_check)
-        .and(warp::get()).map(move |jwt: JWT| {
+        // .and(auth_check)
+        .and(warp::get()).map(move || {
             let tree = TREE.get(&"tree".to_owned()).unwrap();
-            let vals: HashMap<String, String> = tree.iter().into_iter().filter(|x| {
+            let mut vals : Vec<Event> = tree.iter().into_iter().filter(|x| {
                 let p = x.as_ref().unwrap();
                 let k = std::str::from_utf8(&p.0).unwrap().to_owned();
-                if !k.contains("_v_") && !k.contains("_u_") {
-                    return true
+                if k.contains("_v_") {
+                    let v = std::str::from_utf8(&p.1).unwrap().to_owned();
+                    let evt : Event = serde_json::from_str(&v).unwrap();
+                    if !evt.cancelled {
+                        return true
+                    } else {
+                        return false
+                    }
                 } else {
-                    return false
+                   return false
                 }
             }).map(|x| {
                 let p = x.as_ref().unwrap();
                 let v = std::str::from_utf8(&p.1).unwrap().to_owned();
-                let json : Event = serde_json::from_str(&v).unwrap();
-                let data : String = serde_json::to_string(&json.data).unwrap();
-                (json.event, data)
+                let evt : Event = serde_json::from_str(&v).unwrap();
+                evt
             }).collect();
 
-            for (k, v) in vals {
+            vals.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+
+            for (evt, group) in &vals.into_iter().group_by(|evt| evt.event.clone()) {
+                let mut events : HashMap<String, Event> = HashMap::new();
+                for event in group {
+                    if evt == event.event {
+                        events.insert(event.clone().collection_id.to_string(), event.clone());
+                    }
+                }
+                let mut evts : Vec<Event> = Vec::new();
+                for (_, v) in events {
+                    evts.push(v);
+                }
                 let guid = Uuid::new_v4().to_string();
-                let sse = SSE{id: guid, event: k, data: v, retry: Duration::from_millis(5000)};
+                let events_json = json!({"events": evts});
+                let sse = SSE{id: guid, event: evt, data: serde_json::to_string(&events_json).unwrap(), retry: Duration::from_millis(5000)};
                 let (tx, _) = CHANNEL.get(&"chan".to_owned()).unwrap();
                 let _ = tx.send(sse);
             }
 
             let event_stream = interval(Duration::from_millis(100)).map(move |_| {
-                event_stream(jwt.check)
+                event_stream(true)
             });
             
             warp::sse::reply(event_stream)

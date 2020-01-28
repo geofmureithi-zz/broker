@@ -210,5 +210,6 @@ pub async fn main() {
 
 ### Migrations
 
-- from 2.0 to 3.0: the sse endpoint is now secure and requires to use the [broker-client](https://www.npmjs.com/package/broker-client) library
+- from 3.0 to 4.0: the sse endpoint now returns all events with all collections with the latest collection event rather than just the latest event data for all event types
+- from 2.0 to 3.0: the sse endpoint is now secure and requires the use of the [broker-client](https://www.npmjs.com/package/broker-client) library
 - from 1.0 to 2.0: the optional API endpoints URLs have been changed but have the same functionality
