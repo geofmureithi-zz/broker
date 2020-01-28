@@ -130,6 +130,13 @@ pub struct EventForm {
     data: serde_json::Value,
 }
 
+pub fn get_cloudflare_time() -> i64 {
+    let address = "time.cloudflare.com:123";
+    let response = broker_ntp::request(address).unwrap();
+    let timestamp = response.transmit_timestamp;
+    broker_ntp::unix_time::Instant::from(timestamp).secs()
+}
+
 fn cancel(tree: sled::Db, id: String) -> String {
 
     let versioned = format!("_v_{}", id);
@@ -274,11 +281,8 @@ fn user_create(tree: sled::Db, user_form: UserForm) -> (bool, String) {
 }
 
 fn login(tree: sled::Db, login: Login, config: Config) -> (bool, String) {
-  
-    let address = "time.cloudflare.com:123";
-    let response = broker_ntp::request(address).unwrap();
-    let timestamp = response.transmit_timestamp;
-    let now = broker_ntp::unix_time::Instant::from(timestamp).secs();
+
+    let now = get_cloudflare_time();
     let expi = now + config.expiry;
     let expiry = expi as usize;
 
@@ -468,10 +472,7 @@ pub async fn broker() {
                 if k.contains("_v_") {
                     let json : Event = serde_json::from_str(&v).unwrap();
                     if !json.published && !json.cancelled {
-                        let address = "time.cloudflare.com:123";
-                        let response = broker_ntp::request(address).unwrap();
-                        let timestamp = response.transmit_timestamp;
-                        let now = broker_ntp::unix_time::Instant::from(timestamp).secs();
+                        let now = get_cloudflare_time();
                         if json.timestamp <= now  {
                             return true
                         } else {
