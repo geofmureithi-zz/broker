@@ -465,9 +465,16 @@ pub async fn broker() {
                 let v = std::str::from_utf8(&p.1).unwrap().to_owned();
                 if k.contains("_v_") {
                     let json : Event = serde_json::from_str(&v).unwrap();
-                    let now = Utc::now().timestamp();
-                    if json.timestamp <= now && !json.published && !json.cancelled {
-                        return true
+                    if !json.published && !json.cancelled {
+                        let address = "time.cloudflare.com:123";
+                        let response = broker_ntp::request(address).unwrap();
+                        let timestamp = response.transmit_timestamp;
+                        let now = broker_ntp::unix_time::Instant::from(timestamp).secs();
+                        if json.timestamp <= now  {
+                            return true
+                        } else {
+                            return false
+                        }
                     } else {
                         return false
                     }

@@ -22,6 +22,7 @@ Broker follows an insert-only/publish/subscribe paradigm rather than a REST CRUD
 * Has CORS support
 * Provides user authentication with JWTs and Bcrypt(ed) passwords
 * Handles future events via Epoch UNIX timestamp
+* Uses [Cloudflare's Time Service](https://blog.cloudflare.com/secure-time/) and doesn't rely on your local's server time
 * Stateful immutable event persistence
 * Insert event via JSON POST request 
 * Sync latest events on SSE client connection
@@ -36,20 +37,12 @@ When the client first subscribes to the SSE connection all the latest events and
 
 The side-effect of this system is that the latest event is the schema. Old events are saved in the database and are not changed but the latest event is the schema for the front-end. This is pure NoSQL as the backend is agnostic to the event data.
 
-
 ### Recommeded Services/Libraries to use with Broker
 * [broker-client](https://www.npmjs.com/package/broker-client) - the official front-end client for broker
 * [broker-hook](https://www.npmjs.com/package/broker-hook) - the official react hook for broker
 * [Integromat](https://www.integromat.com/) - No-code Event Scheduler that supports many apps like GitHub, Meetup, and etc.
 * [React Hook Form](https://react-hook-form.com/) - Best form library for React
 * [React Debounce Input](https://www.npmjs.com/package/react-debounce-input) - React input for Real-time Submission (Edit in Place forms)
-
-
-### Timekeeping
-
-It is very important to have your server clock be accurate as broker relies on it to process timestamps (events).
-
-The recommended way to do this is to run the [RoughEnough Client](https://crates.io/crates/roughenough) to set the system time using [Cloudflare Roughtime servers](https://developers.cloudflare.com/roughtime/docs/) on a regular basis.
 
 ### API
 
