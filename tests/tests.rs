@@ -1,6 +1,5 @@
 extern crate broker;
 use serde_json::json;
-use chrono::prelude::*;
 
 #[tokio::test]
 async fn test1() {
@@ -9,7 +8,10 @@ async fn test1() {
     let user2 = json!({"username": "rust23", "password": "rust", "collection_id":"3ca76743-8d99-4d3f-b85c-633ea456f90d"});
     let user1_login = json!({"username": "rust22", "password": "rust"});
     let event1 = json!({"event": "test", "collection_id": "3ca76743-8d99-4d3f-b85c-633ea456f90c", "timestamp": 1578667309, "data": "{}"});
-    let now = Utc::now().timestamp();
+    let address = "time.cloudflare.com:123";
+    let response = broker_ntp::request(address).unwrap();
+    let timestamp = response.transmit_timestamp;
+    let now = broker_ntp::unix_time::Instant::from(timestamp).secs();
     let x = now + 1000;
     let event2 = json!({"event": "user", "collection_id": "3ca76743-8d99-4d3f-b85c-633ea456f90d", "timestamp": x, "data": "{}"});
 

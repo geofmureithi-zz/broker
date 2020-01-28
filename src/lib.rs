@@ -6,7 +6,6 @@ use serde_derive::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
 use bcrypt::{DEFAULT_COST, hash, verify};
-use chrono::prelude::*;
 use warp::{Filter, http::StatusCode, sse::ServerSentEvent};
 use jsonwebtoken::{encode, decode, Header, Validation, EncodingKey, DecodingKey};
 use std::convert::Infallible;
@@ -276,7 +275,10 @@ fn user_create(tree: sled::Db, user_form: UserForm) -> (bool, String) {
 
 fn login(tree: sled::Db, login: Login, config: Config) -> (bool, String) {
   
-    let now = Utc::now().timestamp();
+    let address = "time.cloudflare.com:123";
+    let response = broker_ntp::request(address).unwrap();
+    let timestamp = response.transmit_timestamp;
+    let now = broker_ntp::unix_time::Instant::from(timestamp).secs();
     let expi = now + config.expiry;
     let expiry = expi as usize;
 
