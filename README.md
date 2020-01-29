@@ -40,6 +40,7 @@ The side-effect of this system is that the latest event is the schema. Old event
 ### Recommeded Services/Libraries to use with Broker
 * [broker-client](https://www.npmjs.com/package/broker-client) - the official front-end client for broker
 * [broker-hook](https://www.npmjs.com/package/broker-hook) - the official react hook for broker
+* [material-table](https://www.npmjs.com/package/material-table) - the offically supported data-grid of broker
 * [Integromat](https://www.integromat.com/) - No-code Event Scheduler that supports many apps like GitHub, Meetup, and etc.
 * [React Hook Form](https://react-hook-form.com/) - Best form library for React
 * [React Debounce Input](https://www.npmjs.com/package/react-debounce-input) - React input for Real-time Submission (Edit in Place forms)

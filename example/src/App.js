@@ -1,88 +1,86 @@
 import React from 'react';
-import { makeStyles } from '@material-ui/core/styles';
-import Card from '@material-ui/core/Card';
 import { useSSE, SSEProvider } from 'broker-hook';
-import CardContent from '@material-ui/core/CardContent';
-import Typography from '@material-ui/core/Typography';
-import { useForm } from "react-hook-form";
-import {DebounceInput} from 'react-debounce-input';
-import BrokerClient from 'broker-client';
+import Wrapper from './Wrapper';
+import MaterialTable from "material-table";
 
-const useStyles = makeStyles({
-  card: {
-    minWidth: 275,
-    position: "absolute",
-    top: "50%",
-    left: "50%", 
-    backgroundColor: "yellow",
-    transform: "translateX(-50%) translateY(-50%)"
-  },
-  title: {
-    fontSize: 25,
-  },
-});
+import { forwardRef } from 'react';
+
+import AddBox from '@material-ui/icons/AddBox';
+import ArrowDownward from '@material-ui/icons/ArrowDownward';
+import Check from '@material-ui/icons/Check';
+import ChevronLeft from '@material-ui/icons/ChevronLeft';
+import ChevronRight from '@material-ui/icons/ChevronRight';
+import Clear from '@material-ui/icons/Clear';
+import DeleteOutline from '@material-ui/icons/DeleteOutline';
+import Edit from '@material-ui/icons/Edit';
+import FilterList from '@material-ui/icons/FilterList';
+import FirstPage from '@material-ui/icons/FirstPage';
+import LastPage from '@material-ui/icons/LastPage';
+import Remove from '@material-ui/icons/Remove';
+import SaveAlt from '@material-ui/icons/SaveAlt';
+import Search from '@material-ui/icons/Search';
+import ViewColumn from '@material-ui/icons/ViewColumn';
+
+const tableIcons = {
+    Add: forwardRef((props, ref) => <AddBox {...props} ref={ref} />),
+    Check: forwardRef((props, ref) => <Check {...props} ref={ref} />),
+    Clear: forwardRef((props, ref) => <Clear {...props} ref={ref} />),
+    Delete: forwardRef((props, ref) => <DeleteOutline {...props} ref={ref} />),
+    DetailPanel: forwardRef((props, ref) => <ChevronRight {...props} ref={ref} />),
+    Edit: forwardRef((props, ref) => <Edit {...props} ref={ref} />),
+    Export: forwardRef((props, ref) => <SaveAlt {...props} ref={ref} />),
+    Filter: forwardRef((props, ref) => <FilterList {...props} ref={ref} />),
+    FirstPage: forwardRef((props, ref) => <FirstPage {...props} ref={ref} />),
+    LastPage: forwardRef((props, ref) => <LastPage {...props} ref={ref} />),
+    NextPage: forwardRef((props, ref) => <ChevronRight {...props} ref={ref} />),
+    PreviousPage: forwardRef((props, ref) => <ChevronLeft {...props} ref={ref} />),
+    ResetSearch: forwardRef((props, ref) => <Clear {...props} ref={ref} />),
+    Search: forwardRef((props, ref) => <Search {...props} ref={ref} />),
+    SortArrow: forwardRef((props, ref) => <ArrowDownward {...props} ref={ref} />),
+    ThirdStateCheck: forwardRef((props, ref) => <Remove {...props} ref={ref} />),
+    ViewColumn: forwardRef((props, ref) => <ViewColumn {...props} ref={ref} />)
+};
+
 
 const Comments = () => {
   const state = useSSE('user', {
     initialState: {
       data: {
         events: null,
+        rows: null,
+        columns: null
       },
     },
     stateReducer(state, changes) {
       return changes;
     },
     parser(input) {
+      console.log(input)
       return JSON.parse(input)
     },
   });
 
   console.log(state.data);
 
-  return <p>{state.data.events != null && <span>{state.data.events[0].data.user}</span>}</p>;
+  return <div>{state.data.events != null && 
+    <Wrapper>
+    <MaterialTable
+          icons={tableIcons}
+          columns={state.data.columns}
+          data={state.data.rows}
+          title="Demo Title"
+        /></Wrapper>}</div>;
 };
 
 function App() {
-  const classes = useStyles();
   const sseEndpoint = process.env.REACT_APP_EVENTS;
   const apiEndpoint = process.env.REACT_APP_API;
-  const { handleSubmit, register, errors } = useForm();
-  const onSubmit = values => {
-    const ts = Math.round((new Date()).getTime() / 1000);
-    const v = `{"event": "user", "published": false, "timestamp": ${ts}, "data": {"user": "${values.user}"}}`;
-    const sse = new BrokerClient('http://localhost:8080/events', {
-      headers: {
-        authorization: 'Bearer 123',
-      }
-    });
-    sse.addEventListener('internal_status', (messageEvent) => {
-      console.log(messageEvent);
-    });
-  };
 
   return (
     <div>
-      <Card className={classes.card}>
-       <CardContent>
-        <Typography className={classes.title} color="textSecondary" gutterBottom component={'span'} variant={'body2'}>
-          What is your name?&nbsp;
-            <SSEProvider endpoint={sseEndpoint} options={{headers: {authorization: 'Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI3OGJjZDYxNC1jZDM5LTQzMWEtYWIyNC04OWQ5MTlkYmJmODkiLCJjb21wYW55IjoiIiwiZXhwIjoxNTgwMjU2ODA4fQ.cYFclXygM8AM_bt5I7lyGRZDhW_LL1Z1ZFgV5EHbnoI'}}}>
-              <Comments />
-            </SSEProvider>
-          </Typography>
-          <form>
-              <label htmlFor="user">Name: </label>
-              <DebounceInput
-                name="user"
-                minLength={2}
-                debounceTimeout={500}
-                onChange={handleSubmit(onSubmit)}
-                inputRef={register({})}
-              />
-              {errors.user && errors.user.message}
-          </form>
-        </CardContent>
-      </Card>
+      <SSEProvider endpoint={sseEndpoint} options={{headers: {authorization: 'Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI3OGJjZDYxNC1jZDM5LTQzMWEtYWIyNC04OWQ5MTlkYmJmODkiLCJjb21wYW55IjoiIiwiZXhwIjoxNTgwMjU2ODA4fQ.cYFclXygM8AM_bt5I7lyGRZDhW_LL1Z1ZFgV5EHbnoI'}}}>
+        <Comments />
+      </SSEProvider>
     </div>
   );
 }

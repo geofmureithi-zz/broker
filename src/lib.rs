@@ -12,6 +12,7 @@ use std::convert::Infallible;
 use std::time::Duration;
 use lazy_static::lazy_static;
 use crossbeam::channel::unbounded;
+use inflector::Inflector;
 
 lazy_static! {
     static ref CHANNEL: HashMap<String, (crossbeam::channel::Sender<SSE>, crossbeam::channel::Receiver<SSE>)> = {
@@ -528,9 +529,9 @@ pub async fn broker() {
                     let evt : Event = serde_json::from_str(&v).unwrap();
                     evt
                 }).collect();
-    
+
                 vals.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
-    
+
                 let mut uniques : HashSet<String> = HashSet::new();
                 for evt in &vals {
                     uniques.insert(evt.clone().event);
@@ -544,12 +545,27 @@ pub async fn broker() {
                         }
                     }
                     let mut evts : Vec<Event> = Vec::new();
+                    let mut uniq_data_keys : HashSet<String> = HashSet::new();
+                    let mut rows : Vec<serde_json::Value> = Vec::new();
                     for (_, v) in events {
-                        evts.push(v);
+                        evts.push(v.clone());
+                        if v.clone().data.is_object() {
+                            rows.push(v.clone().data);
+                            for (k, _) in v.clone().data.as_object().unwrap() {
+                                uniq_data_keys.insert(k.clone());
+                            }
+                        }
                     }
+    
+                    let mut columns : Vec<serde_json::Value> = Vec::new();
+                    for uniq_key in uniq_data_keys {
+                        columns.push(json!({"title": Inflector::to_sentence_case(&uniq_key), "field": uniq_key}));
+                    }
+                    
+                    columns.sort_by(|a, b| a.to_string().cmp(&b.to_string()));
 
                     let guid = Uuid::new_v4().to_string();
-                    let events_json = json!({"events": evts});
+                    let events_json = json!({"events": evts, "columns": columns, "rows": rows});
                     let sse = SSE{id: guid, event: evt, data: serde_json::to_string(&events_json).unwrap(), retry: Duration::from_millis(5000)};
                     let (tx, _) = CHANNEL.get(&"chan".to_owned()).unwrap();
                     let _ = tx.send(sse);
@@ -561,58 +577,74 @@ pub async fn broker() {
     let sse_route = warp::path("events")
         .and(auth_check)
         .and(warp::get()).map(move |jwt: JWT| {
-            let tree = TREE.get(&"tree".to_owned()).unwrap();
-            let mut vals : Vec<Event> = tree.iter().into_iter().filter(|x| {
-                let p = x.as_ref().unwrap();
-                let k = std::str::from_utf8(&p.0).unwrap().to_owned();
-                if k.contains("_v_") {
-                    let v = std::str::from_utf8(&p.1).unwrap().to_owned();
-                    let evt : Event = serde_json::from_str(&v).unwrap();
-                    if !evt.cancelled {
-                        return true
-                    } else {
-                        return false
-                    }
-                } else {
-                   return false
-                }
-            }).map(|x| {
-                let p = x.as_ref().unwrap();
+        let tree = TREE.get(&"tree".to_owned()).unwrap();
+        let mut vals : Vec<Event> = tree.iter().into_iter().filter(|x| {
+            let p = x.as_ref().unwrap();
+            let k = std::str::from_utf8(&p.0).unwrap().to_owned();
+            if k.contains("_v_") {
                 let v = std::str::from_utf8(&p.1).unwrap().to_owned();
                 let evt : Event = serde_json::from_str(&v).unwrap();
-                evt
-            }).collect();
-
-            vals.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
-            let mut uniques : HashSet<String> = HashSet::new();
-            for evt in &vals {
-                uniques.insert(evt.clone().event);
+                if !evt.cancelled {
+                    return true
+                } else {
+                    return false
+                }
+            } else {
+                return false
             }
+        }).map(|x| {
+            let p = x.as_ref().unwrap();
+            let v = std::str::from_utf8(&p.1).unwrap().to_owned();
+            let evt : Event = serde_json::from_str(&v).unwrap();
+            evt
+        }).collect();
 
-            for evt in uniques {
-                let mut events : HashMap<String, Event> = HashMap::new();
-                for event in &vals {
-                    if evt == event.event {
-                        events.insert(event.clone().collection_id.to_string(), event.clone());
+        vals.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+
+        let mut uniques : HashSet<String> = HashSet::new();
+        for evt in &vals {
+            uniques.insert(evt.clone().event);
+        }
+
+        for evt in uniques {
+            let mut events : HashMap<String, Event> = HashMap::new();
+            for event in &vals {
+                if evt == event.event {
+                    events.insert(event.clone().collection_id.to_string(), event.clone());
+                }
+            }
+            let mut evts : Vec<Event> = Vec::new();
+            let mut uniq_data_keys : HashSet<String> = HashSet::new();
+            let mut rows : Vec<serde_json::Value> = Vec::new();
+            for (_, v) in events {
+                evts.push(v.clone());
+                if v.clone().data.is_object() {
+                    rows.push(v.clone().data);
+                    for (k, _) in v.clone().data.as_object().unwrap() {
+                        uniq_data_keys.insert(k.clone());
                     }
                 }
-                let mut evts : Vec<Event> = Vec::new();
-                for (_, v) in events {
-                    evts.push(v);
-                }
-
-                let guid = Uuid::new_v4().to_string();
-                let events_json = json!({"events": evts});
-                let sse = SSE{id: guid, event: evt, data: serde_json::to_string(&events_json).unwrap(), retry: Duration::from_millis(5000)};
-                let (tx, _) = CHANNEL.get(&"chan".to_owned()).unwrap();
-                let _ = tx.send(sse);
             }
 
-            let event_stream = interval(Duration::from_millis(100)).map(move |_| {
-                event_stream(jwt.check)
-            });
-            
-            warp::sse::reply(event_stream)
+            let mut columns : Vec<serde_json::Value> = Vec::new();
+            for uniq_key in uniq_data_keys {
+                columns.push(json!({"title": Inflector::to_sentence_case(&uniq_key), "field": uniq_key}));
+            }
+
+            columns.sort_by(|a, b| a.to_string().cmp(&b.to_string()));
+
+            let guid = Uuid::new_v4().to_string();
+            let events_json = json!({"events": evts, "columns": columns, "rows": rows});
+            let sse = SSE{id: guid, event: evt, data: serde_json::to_string(&events_json).unwrap(), retry: Duration::from_millis(5000)};
+            let (tx, _) = CHANNEL.get(&"chan".to_owned()).unwrap();
+            let _ = tx.send(sse);
+        }
+
+        let event_stream = interval(Duration::from_millis(100)).map(move |_| {
+            event_stream(jwt.check)
+        });
+        
+        warp::sse::reply(event_stream)
     });
 
     let cancel_route = warp::get()
