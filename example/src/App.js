@@ -2,6 +2,7 @@ import React from 'react';
 import { useSSE, SSEProvider } from 'broker-hook';
 import Wrapper from './Wrapper';
 import MaterialTable from "material-table";
+import uuid from 'uuid/v4';
 
 import { forwardRef } from 'react';
 
@@ -41,9 +42,12 @@ const tableIcons = {
     ViewColumn: forwardRef((props, ref) => <ViewColumn {...props} ref={ref} />)
 };
 
+const eventListen = 'user';
+const apiEndpoint = process.env.REACT_APP_API;
+const token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxNGM3NjEwYS1lM2RhLTRkNzItOGYyYS1iYjJjZDYwYzNhOGEiLCJjb21wYW55IjoiIiwiZXhwIjoxNTgwMzM5MTkwfQ.rQTEPK3bovxjfmpRBnfIVS-Ki6qq53UVt8J4Qb5Vm5M";
 
 const Comments = () => {
-  const state = useSSE('user', {
+  const state = useSSE(eventListen, {
     initialState: {
       data: {
         events: null,
@@ -55,12 +59,9 @@ const Comments = () => {
       return changes;
     },
     parser(input) {
-      console.log(input)
       return JSON.parse(input)
     },
   });
-
-  console.log(state.data);
 
   return <div>{state.data.events != null && 
     <Wrapper>
@@ -69,16 +70,51 @@ const Comments = () => {
           columns={state.data.columns}
           data={state.data.rows}
           title="Demo Title"
+          editable={{
+            onRowAdd: newData =>
+              new Promise((resolve, reject) => {
+                setTimeout(() => {
+                  {
+                    const id = uuid();
+                    const ts = Math.round((new Date()).getTime() / 1000);
+                    const v = `{"event": "${eventListen}", "collection_id": "${id}", "timestamp": ${ts}, "data": "${newData}"}`;
+                    console.log(newData);
+                    fetch(apiEndpoint, {
+                      method: 'post',
+                      mode: 'cors',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                      },
+                      body: v
+                    }).then(response => {
+                      return response.json();
+                    }, err => {
+                      console.log(err);
+                    });
+                  };
+                  resolve()
+                }, 1000)
+              }),
+            onRowUpdate: (newData, oldData) =>
+              new Promise((resolve, reject) => {
+                setTimeout(() => {
+                  {
+                    console.log('update');
+                  }
+                  resolve()
+                }, 1000)
+              }),
+          }}
         /></Wrapper>}</div>;
 };
 
 function App() {
   const sseEndpoint = process.env.REACT_APP_EVENTS;
-  const apiEndpoint = process.env.REACT_APP_API;
 
   return (
     <div>
-      <SSEProvider endpoint={sseEndpoint} options={{headers: {authorization: 'Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI3OGJjZDYxNC1jZDM5LTQzMWEtYWIyNC04OWQ5MTlkYmJmODkiLCJjb21wYW55IjoiIiwiZXhwIjoxNTgwMjU2ODA4fQ.cYFclXygM8AM_bt5I7lyGRZDhW_LL1Z1ZFgV5EHbnoI'}}}>
+      <SSEProvider endpoint={sseEndpoint} options={{headers: {authorization: `Bearer ${token}`}}}>
         <Comments />
       </SSEProvider>
     </div>
