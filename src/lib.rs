@@ -1,7 +1,7 @@
 use tokio::stream::StreamExt;
 use tokio::time::interval;
 use std::iter::Iterator;
-use std::collections::HashMap;
+use std::collections::{HashSet, HashMap};
 use serde_derive::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
@@ -12,7 +12,6 @@ use std::convert::Infallible;
 use std::time::Duration;
 use lazy_static::lazy_static;
 use crossbeam::channel::unbounded;
-use itertools::Itertools;
 
 lazy_static! {
     static ref CHANNEL: HashMap<String, (crossbeam::channel::Sender<SSE>, crossbeam::channel::Receiver<SSE>)> = {
@@ -532,9 +531,14 @@ pub async fn broker() {
     
                 vals.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
     
-                for (evt, group) in &vals.into_iter().group_by(|evt| evt.event.clone()) {
+                let mut uniques : HashSet<String> = HashSet::new();
+                for evt in &vals {
+                    uniques.insert(evt.clone().event);
+                }
+    
+                for evt in uniques {
                     let mut events : HashMap<String, Event> = HashMap::new();
-                    for event in group {
+                    for event in &vals {
                         if evt == event.event {
                             events.insert(event.clone().collection_id.to_string(), event.clone());
                         }
@@ -543,6 +547,7 @@ pub async fn broker() {
                     for (_, v) in events {
                         evts.push(v);
                     }
+
                     let guid = Uuid::new_v4().to_string();
                     let events_json = json!({"events": evts});
                     let sse = SSE{id: guid, event: evt, data: serde_json::to_string(&events_json).unwrap(), retry: Duration::from_millis(5000)};
@@ -554,8 +559,7 @@ pub async fn broker() {
     });
     
     let sse_route = warp::path("events")
-        .and(auth_check)
-        .and(warp::get()).map(move |jwt: JWT| {
+        .and(warp::get()).map(move || {
             let tree = TREE.get(&"tree".to_owned()).unwrap();
             let mut vals : Vec<Event> = tree.iter().into_iter().filter(|x| {
                 let p = x.as_ref().unwrap();
@@ -579,10 +583,14 @@ pub async fn broker() {
             }).collect();
 
             vals.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+            let mut uniques : HashSet<String> = HashSet::new();
+            for evt in &vals {
+                uniques.insert(evt.clone().event);
+            }
 
-            for (evt, group) in &vals.into_iter().group_by(|evt| evt.event.clone()) {
+            for evt in uniques {
                 let mut events : HashMap<String, Event> = HashMap::new();
-                for event in group {
+                for event in &vals {
                     if evt == event.event {
                         events.insert(event.clone().collection_id.to_string(), event.clone());
                     }
@@ -591,6 +599,7 @@ pub async fn broker() {
                 for (_, v) in events {
                     evts.push(v);
                 }
+
                 let guid = Uuid::new_v4().to_string();
                 let events_json = json!({"events": evts});
                 let sse = SSE{id: guid, event: evt, data: serde_json::to_string(&events_json).unwrap(), retry: Duration::from_millis(5000)};
@@ -599,7 +608,7 @@ pub async fn broker() {
             }
 
             let event_stream = interval(Duration::from_millis(100)).map(move |_| {
-                event_stream(jwt.check)
+                event_stream(true)
             });
             
             warp::sse::reply(event_stream)
