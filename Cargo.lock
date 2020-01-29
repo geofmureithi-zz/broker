@@ -99,7 +99,7 @@ dependencies = [
 
 [[package]]
 name = "broker"
-version = "4.0.0"
+version = "4.1.0"
 dependencies = [
  "bcrypt 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "broker-ntp 0.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
