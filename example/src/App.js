@@ -3,6 +3,7 @@ import { useSSE, SSEProvider } from 'broker-hook';
 import Wrapper from './Wrapper';
 import MaterialTable from "material-table";
 import uuid from 'uuid/v4';
+import _ from 'lodash';
 
 import { forwardRef } from 'react';
 
@@ -44,7 +45,7 @@ const tableIcons = {
 
 const eventListen = 'user';
 const apiEndpoint = process.env.REACT_APP_API;
-const token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxNGM3NjEwYS1lM2RhLTRkNzItOGYyYS1iYjJjZDYwYzNhOGEiLCJjb21wYW55IjoiIiwiZXhwIjoxNTgwMzM5MTkwfQ.rQTEPK3bovxjfmpRBnfIVS-Ki6qq53UVt8J4Qb5Vm5M";
+const token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxNGM3NjEwYS1lM2RhLTRkNzItOGYyYS1iYjJjZDYwYzNhOGEiLCJjb21wYW55IjoiIiwiZXhwIjoxNTgwMzc3ODQ2fQ.EpDSaQBRRLKFkDB2m_kxtllqVDIX-tDFkSpVX2hSuRg";
 
 const Comments = () => {
   const state = useSSE(eventListen, {
@@ -77,8 +78,9 @@ const Comments = () => {
                   {
                     const id = uuid();
                     const ts = Math.round((new Date()).getTime() / 1000);
-                    const v = `{"event": "${eventListen}", "collection_id": "${id}", "timestamp": ${ts}, "data": "${newData}"}`;
-                    console.log(newData);
+                    _.omit(newData, ['timestamp', 'collection_id']);
+                    const j = JSON.stringify(newData);
+                    const v = `{"event": "${eventListen}", "collection_id": "${id}", "timestamp": ${ts}, "data": ${j}}`;
                     fetch(apiEndpoint, {
                       method: 'post',
                       mode: 'cors',
@@ -97,14 +99,30 @@ const Comments = () => {
                 }, 1000)
               }),
             onRowUpdate: (newData, oldData) =>
-              new Promise((resolve, reject) => {
-                setTimeout(() => {
-                  {
-                    console.log('update');
-                  }
-                  resolve()
-                }, 1000)
-              }),
+            new Promise((resolve, reject) => {
+              setTimeout(() => {
+                {
+                  const ts = Math.round((new Date()).getTime() / 1000);
+                  _.omit(newData, ['timestamp', 'collection_id']);
+                  const j = JSON.stringify(newData);
+                  const v = `{"event": "${eventListen}", "collection_id": "${oldData.collection_id}", "timestamp": ${ts}, "data": ${j}}`;
+                  fetch(apiEndpoint, {
+                    method: 'post',
+                    mode: 'cors',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${token}`
+                    },
+                    body: v
+                  }).then(response => {
+                    return response.json();
+                  }, err => {
+                    console.log(err);
+                  });
+                };
+                resolve()
+              }, 1000)
+            }),
           }}
         /></Wrapper>}</div>;
 };

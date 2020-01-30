@@ -1,7 +1,7 @@
 use tokio::stream::StreamExt;
 use tokio::time::interval;
 use std::iter::Iterator;
-use std::collections::{HashSet, HashMap};
+use std::collections::{HashSet, HashMap, VecDeque};
 use serde_derive::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
@@ -13,6 +13,7 @@ use std::time::Duration;
 use lazy_static::lazy_static;
 use crossbeam::channel::unbounded;
 use inflector::Inflector;
+use json_patch::merge;
 
 lazy_static! {
     static ref CHANNEL: HashMap<String, (crossbeam::channel::Sender<SSE>, crossbeam::channel::Receiver<SSE>)> = {
@@ -536,7 +537,7 @@ pub async fn broker() {
                 for evt in &vals {
                     uniques.insert(evt.clone().event);
                 }
-    
+        
                 for evt in uniques {
                     let mut events : HashMap<String, Event> = HashMap::new();
                     for event in &vals {
@@ -548,24 +549,40 @@ pub async fn broker() {
                     let mut uniq_data_keys : HashSet<String> = HashSet::new();
                     let mut rows : Vec<serde_json::Value> = Vec::new();
                     for (_, v) in events {
-                        evts.push(v.clone());
                         if v.clone().data.is_object() {
-                            rows.push(v.clone().data);
+                            evts.push(v.clone());
+                            let mut data = v.clone().data;
+                            let j = json!({"timestamp": v.clone().timestamp.to_string()});
+                            merge(&mut data, &j);
+                            let j = json!({"collection_id": v.clone().collection_id});
+                            merge(&mut data, &j);
+                            rows.push(data);
                             for (k, _) in v.clone().data.as_object().unwrap() {
                                 uniq_data_keys.insert(k.clone());
                             }
                         }
                     }
-    
-                    let mut columns : Vec<serde_json::Value> = Vec::new();
+        
+                    rows.sort_by(|a, b| a.get("timestamp").unwrap().to_string().cmp(&b.get("timestamp").unwrap().to_string()));
+                    rows.reverse();
+        
+                    let mut columns : VecDeque<serde_json::Value> = VecDeque::new();
                     for uniq_key in uniq_data_keys {
-                        columns.push(json!({"title": Inflector::to_sentence_case(&uniq_key), "field": uniq_key}));
+                        if uniq_key != "collection_id" && uniq_key != "timestamp" {
+                            columns.push_back(json!({"title": Inflector::to_sentence_case(&uniq_key), "field": uniq_key}));
+                        }
                     }
-                    
-                    columns.sort_by(|a, b| a.to_string().cmp(&b.to_string()));
+                    let mut cols : Vec<&serde_json::Value> = columns.iter().collect();
+                    cols.sort_by(|a, b| a.to_string().cmp(&b.to_string()));
+                    let mut colz : VecDeque<serde_json::Value> = VecDeque::new();
+                    for col in cols {
+                        colz.push_back(col.clone());
+                    }
+                    colz.push_front(json!({"title": "collection_id", "field": "collection_id"}));
+                    colz.push_front(json!({"title": "Timestamp", "field": "timestamp"}));
 
                     let guid = Uuid::new_v4().to_string();
-                    let events_json = json!({"events": evts, "columns": columns, "rows": rows});
+                    let events_json = json!({"events": evts, "columns": colz, "rows": rows});
                     let sse = SSE{id: guid, event: evt, data: serde_json::to_string(&events_json).unwrap(), retry: Duration::from_millis(5000)};
                     let (tx, _) = CHANNEL.get(&"chan".to_owned()).unwrap();
                     let _ = tx.send(sse);
@@ -617,24 +634,41 @@ pub async fn broker() {
             let mut uniq_data_keys : HashSet<String> = HashSet::new();
             let mut rows : Vec<serde_json::Value> = Vec::new();
             for (_, v) in events {
-                evts.push(v.clone());
                 if v.clone().data.is_object() {
-                    rows.push(v.clone().data);
+                    evts.push(v.clone());
+                    let mut data = v.clone().data;
+                    let j = json!({"timestamp": v.clone().timestamp.to_string()});
+                    merge(&mut data, &j);
+                    let j = json!({"collection_id": v.clone().collection_id});
+                    merge(&mut data, &j);
+                    rows.push(data);
                     for (k, _) in v.clone().data.as_object().unwrap() {
                         uniq_data_keys.insert(k.clone());
                     }
                 }
             }
 
-            let mut columns : Vec<serde_json::Value> = Vec::new();
+            rows.sort_by(|a, b| a.get("timestamp").unwrap().to_string().cmp(&b.get("timestamp").unwrap().to_string()));
+            rows.reverse();
+
+            let mut columns : VecDeque<serde_json::Value> = VecDeque::new();
             for uniq_key in uniq_data_keys {
-                columns.push(json!({"title": Inflector::to_sentence_case(&uniq_key), "field": uniq_key}));
+                if uniq_key != "collection_id" && uniq_key != "timestamp" {
+                    columns.push_back(json!({"title": Inflector::to_sentence_case(&uniq_key), "field": uniq_key}));
+                }
             }
 
-            columns.sort_by(|a, b| a.to_string().cmp(&b.to_string()));
+            let mut cols : Vec<&serde_json::Value> = columns.iter().collect();
+            cols.sort_by(|a, b| a.to_string().cmp(&b.to_string()));
+            let mut colz : VecDeque<serde_json::Value> = VecDeque::new();
+            for col in cols {
+                colz.push_back(col.clone());
+            }
+            colz.push_front(json!({"title": "collection_id", "field": "collection_id"}));
+            colz.push_front(json!({"title": "Timestamp", "field": "timestamp"}));
 
             let guid = Uuid::new_v4().to_string();
-            let events_json = json!({"events": evts, "columns": columns, "rows": rows});
+            let events_json = json!({"events": evts, "columns": colz, "rows": rows});
             let sse = SSE{id: guid, event: evt, data: serde_json::to_string(&events_json).unwrap(), retry: Duration::from_millis(5000)};
             let (tx, _) = CHANNEL.get(&"chan".to_owned()).unwrap();
             let _ = tx.send(sse);
