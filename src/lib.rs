@@ -592,8 +592,7 @@ pub async fn broker() {
     });
     
     let sse_route = warp::path("events")
-        .and(auth_check)
-        .and(warp::get()).map(move |jwt: JWT| {
+        .and(warp::get()).map(move || {
         let tree = TREE.get(&"tree".to_owned()).unwrap();
         let mut vals : Vec<Event> = tree.iter().into_iter().filter(|x| {
             let p = x.as_ref().unwrap();
@@ -675,7 +674,7 @@ pub async fn broker() {
         }
 
         let event_stream = interval(Duration::from_millis(100)).map(move |_| {
-            event_stream(jwt.check)
+            event_stream(true)
         });
         
         warp::sse::reply(event_stream)
