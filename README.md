@@ -1,11 +1,11 @@
-## Broker - Real-time Zero-Code API Server
+## Broker - Real-time BaaS (Backend as a Service)
 
 [![crates.io](https://meritbadge.herokuapp.com/broker)](https://crates.io/crates/broker)
 [![broker](https://snapcraft.io//broker/badge.svg)](https://snapcraft.io/broker)
 
 ### Purpose
 
-The purpose of this library is to be your real-time zero-code API server. 
+The purpose of this library is to be your real-time BaaS (Backend as a Service). 
 
 Broker is a SSE message broker that requires you write no backend code to have a full real-time API.
 
@@ -44,6 +44,13 @@ The side-effect of this system is that the latest event is the schema. Old event
 * [Integromat](https://www.integromat.com/) - No-code Event Scheduler that supports many apps like GitHub, Meetup, and etc.
 * [React Hook Form](https://react-hook-form.com/) - Best form library for React
 * [React Debounce Input](https://www.npmjs.com/package/react-debounce-input) - React input for Real-time Submission (Edit in Place forms)
+
+### Broker FAQ
+* Why compete against Parse Server and Firebase?
+    * [Firebase](https://firebase.google.com/) is not open-source, is not free, and has complicated pricing. [Parse Server](https://github.com/parse-community/parse-server) doesn't have real-time features and is about 30,000 LOC of JS.
+
+* Will broker work with mobile apps?
+    * Yes with React Native. There may be native 3rd party libraries for SSE that work. In the future official libraries may be made available for native platforms.
 
 ### API
 
@@ -185,14 +192,6 @@ pub async fn main() {
 - the expiry (for jwts) needs to be passed in as a flag
 - the secret (for jwts) needs to be passed in as a flag
 - example: sudo broker -port 8080 -origin http://localhost:3000 -expiry 3600 -secret secret
-
-### Run Example
-
-- ``` make ```
-
-### Run Integration Tests
-
-- ``` cargo test ```
 
 ### Under the Hood
 
