@@ -47,10 +47,12 @@ The side-effect of this system is that the latest event is the schema. Old event
 
 ### Broker FAQ
 * Why compete against Parse Server and Firebase?
-    * [Firebase](https://firebase.google.com/) is not open-source, is not free, and has complicated pricing. [Parse Server](https://github.com/parse-community/parse-server) doesn't have real-time features and is about 30,000 LOC of JS.
+
+[Firebase](https://firebase.google.com/) is not open-source, is not free, and has complicated pricing. [Parse Server](https://github.com/parse-community/parse-server) doesn't have real-time features and is about 30,000 LOC of JS.
 
 * Will broker work with mobile apps?
-    * Yes with React Native. There may be native 3rd party libraries for SSE that work. In the future official libraries may be made available for native platforms.
+
+Yes with React Native. There may be native 3rd party libraries for SSE that work. In the future official libraries may be made available for native platforms.
 
 ### API
 
