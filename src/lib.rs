@@ -678,7 +678,7 @@ pub async fn broker() {
             let _ = tx.send(sse);
         }
 
-        let event_stream = interval(Duration::from_millis(1000)).map(move |_| {
+        let event_stream = interval(Duration::from_millis(100)).map(move |_| {
 
             let sse = match rx_main.try_recv() {
                 Ok(sse) => sse,
