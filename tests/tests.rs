@@ -8,7 +8,7 @@ async fn test1() {
     let user2 = json!({"username": "rust23", "password": "rust", "collection_id":"3ca76743-8d99-4d3f-b85c-633ea456f90d"});
     let user1_login = json!({"username": "rust22", "password": "rust"});
     let event1 = json!({"event": "test", "collection_id": "3ca76743-8d99-4d3f-b85c-633ea456f90c", "timestamp": 1578667309, "data": "{}"});
-    let now = broker::get_cloudflare_time();
+    let now = broker::get_ntp_time();
     let x = now + 1000;
     let event2 = json!({"event": "user", "collection_id": "3ca76743-8d99-4d3f-b85c-633ea456f90d", "timestamp": x, "data": "{}"});
 

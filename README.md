@@ -22,7 +22,7 @@ Broker follows an insert-only/publish/subscribe paradigm rather than a REST CRUD
 * Has CORS support
 * Provides user authentication with JWTs and Bcrypt(ed) passwords
 * Handles future events via Epoch UNIX timestamp
-* Uses [Cloudflare's Time Service](https://blog.cloudflare.com/secure-time/) and doesn't rely on your local server time
+* Uses Global NTP (Cloudflare & Pool) and doesn't rely on your local server time
 * Stateful immutable event persistence
 * Insert event via JSON POST request 
 * Sync latest events on SSE client connection

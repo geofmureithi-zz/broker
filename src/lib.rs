@@ -17,6 +17,7 @@ use inflector::Inflector;
 use json_patch::merge;
 use std::sync::{Arc, Mutex};
 
+// init database as lazy
 lazy_static! {
     static ref TREE: HashMap<String, sled::Db> = {
         let configure = config();
@@ -124,13 +125,103 @@ pub struct EventForm {
     data: serde_json::Value,
 }
 
-pub fn get_cloudflare_time() -> i64 {
-    let address = "time.cloudflare.com:123";
-    let response = broker_ntp::request(address).unwrap();
+// helper function to create sse events
+fn get_events() -> Vec<SSE> {
+    let tree = TREE.get(&"tree".to_owned()).unwrap();
+    let mut vals : Vec<Event> = tree.iter().into_iter().filter(|x| {
+        let p = x.as_ref().unwrap();
+        let k = std::str::from_utf8(&p.0).unwrap().to_owned();
+        if k.contains("_v_") {
+            let v = std::str::from_utf8(&p.1).unwrap().to_owned();
+            let evt : Event = serde_json::from_str(&v).unwrap();
+            if !evt.cancelled {
+                return true
+            } else {
+                return false
+            }
+        } else {
+            return false
+        }
+    }).map(|x| {
+        let p = x.as_ref().unwrap();
+        let v = std::str::from_utf8(&p.1).unwrap().to_owned();
+        let evt : Event = serde_json::from_str(&v).unwrap();
+        evt
+    }).collect();
+
+    vals.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+
+    let mut uniques : HashSet<String> = HashSet::new();
+    for evt in &vals {
+        uniques.insert(evt.clone().event);
+    }
+
+    let mut sse_events : Vec<SSE> = Vec::new();
+
+    for evt in uniques {
+        let mut events : HashMap<String, Event> = HashMap::new();
+        for event in &vals {
+            if evt == event.event {
+                events.insert(event.clone().collection_id.to_string(), event.clone());
+            }
+        }
+        let mut evts : Vec<Event> = Vec::new();
+        let mut uniq_data_keys : HashSet<String> = HashSet::new();
+        let mut rows : Vec<serde_json::Value> = Vec::new();
+        for (_, v) in events {
+            if v.clone().data.is_object() {
+                evts.push(v.clone());
+                let mut data = v.clone().data;
+                let j = json!({"timestamp": v.clone().timestamp.to_string()});
+                merge(&mut data, &j);
+                let j = json!({"collection_id": v.clone().collection_id});
+                merge(&mut data, &j);
+                rows.push(data);
+                for (k, _) in v.clone().data.as_object().unwrap() {
+                    uniq_data_keys.insert(k.clone());
+                }
+            }
+        }
+
+        rows.sort_by(|a, b| a.get("timestamp").unwrap().to_string().cmp(&b.get("timestamp").unwrap().to_string()));
+        rows.reverse();
+
+        let mut columns : VecDeque<serde_json::Value> = VecDeque::new();
+        for uniq_key in uniq_data_keys {
+            if uniq_key != "collection_id" && uniq_key != "timestamp" {
+                columns.push_back(json!({"title": Inflector::to_sentence_case(&uniq_key), "field": uniq_key}));
+            }
+        }
+
+        let mut cols : Vec<&serde_json::Value> = columns.iter().collect();
+        cols.sort_by(|a, b| a.to_string().cmp(&b.to_string()));
+        let mut colz : VecDeque<serde_json::Value> = VecDeque::new();
+        for col in cols {
+            colz.push_back(col.clone());
+        }
+        colz.push_front(json!({"title": "collection_id", "field": "collection_id"}));
+        colz.push_front(json!({"title": "Timestamp", "field": "timestamp"}));
+
+        let guid = Uuid::new_v4().to_string();
+        let events_json = json!({"events": evts, "columns": colz, "rows": rows});
+        sse_events.push(SSE{id: guid, event: evt, data: serde_json::to_string(&events_json).unwrap(), retry: Duration::from_millis(5000)});
+    }
+    sse_events
+}
+
+// get ntp time from global servers (cloudflare primary and fallback pool)
+pub fn get_ntp_time() -> i64 {
+    let pool_ntp = "pool.ntp.org:123";
+    let cf_ntp = "time.cloudflare.com:123";
+    let response = match broker_ntp::request(cf_ntp) {
+        Ok(res) => res,
+        Err(_) => broker_ntp::request(pool_ntp).unwrap()
+    };
     let timestamp = response.transmit_timestamp;
     broker_ntp::unix_time::Instant::from(timestamp).secs()
 }
 
+// cancel future event
 fn cancel(tree: sled::Db, id: String) -> String {
 
     let versioned = format!("_v_{}", id);
@@ -144,6 +235,7 @@ fn cancel(tree: sled::Db, id: String) -> String {
     json!({"event": json}).to_string()
 }
 
+// display user collection of events
 fn user_collection(tree: sled::Db, id: String) -> String {
 
     let versioned = format!("_u_{}", id);
@@ -204,7 +296,7 @@ fn user_collection(tree: sled::Db, id: String) -> String {
     data
 }
 
-
+// display collection of events based on collection_id
 fn collection(tree: sled::Db, id: String) -> String {
  
     let mut records: Vec<Event> = tree.iter().into_iter().filter(|x| {
@@ -235,6 +327,7 @@ fn collection(tree: sled::Db, id: String) -> String {
     data
 }
 
+// create a user
 fn user_create(tree: sled::Db, user_form: UserForm) -> (bool, String) {
  
     let records : HashMap<String, String> = tree.iter().into_iter().filter(|x| {
@@ -274,9 +367,10 @@ fn user_create(tree: sled::Db, user_form: UserForm) -> (bool, String) {
     }
 }
 
+// login with user creds
 fn login(tree: sled::Db, login: Login, config: Config) -> (bool, String) {
 
-    let now = get_cloudflare_time();
+    let now = get_ntp_time();
     let expi = now + config.expiry;
     let expiry = expi as usize;
 
@@ -316,6 +410,7 @@ fn login(tree: sled::Db, login: Login, config: Config) -> (bool, String) {
     (false, "".to_owned())
 }
 
+// config based on sane local dev defaults (uses double dashes for flags)
 fn config() -> Config {
  
     let mut port = "8080".to_owned();
@@ -337,6 +432,7 @@ fn config() -> Config {
     Config{port: port, secret: secret, origin: origin, save_path: save_path, expiry: expiry}
 }
 
+// verify the exp and key of the JWT
 fn jwt_verify(config: Config, token: String) -> JWT {
   
     let parts = token.split(" ");
@@ -355,6 +451,7 @@ fn jwt_verify(config: Config, token: String) -> JWT {
     JWT{check: false, claims: Claims{company: "".to_owned(), exp: 0, sub: "".to_owned()}}
 }
 
+// insert an event
 fn insert(tree: sled::Db, user_id_str: String, evt: EventForm) -> String {
   
     let user_id = uuid::Uuid::parse_str(&user_id_str).unwrap();
@@ -371,6 +468,7 @@ fn insert(tree: sled::Db, user_id_str: String, evt: EventForm) -> String {
     json!({"event": j}).to_string()
 }
 
+// create a sse event
 fn event_stream(rx: crossbeam::channel::Receiver<SSE>, allowed: bool) -> Result<impl ServerSentEvent, Infallible> {
  
     if allowed {
@@ -401,9 +499,13 @@ fn event_stream(rx: crossbeam::channel::Receiver<SSE>, allowed: bool) -> Result<
     }
 }
 
+// main function
 pub async fn broker() {
+
+    // start logging
     pretty_env_logger::init();
 
+    // user create route
     let user_create_route = warp::post()
         .and(warp::path("users"))
         .and(warp::body::json())
@@ -419,11 +521,13 @@ pub async fn broker() {
             }
         });
     
+    // auth check middleware
     let auth_check = warp::header::<String>("authorization").map(|token| {
         let configure = config();
         jwt_verify(configure, token)
     });
 
+    // login route
     let login_route = warp::post()
         .and(warp::path("login"))
         .and(warp::body::json())
@@ -440,6 +544,7 @@ pub async fn broker() {
             }
         });
 
+    // insert route
     let insert_route = warp::post()
         .and(warp::path("insert"))
         .and(auth_check)
@@ -456,13 +561,15 @@ pub async fn broker() {
             }
         });
 
-    // set up fan-out
+    // create thread-safe broadcast bus
     let mix_tx = Bus::new(100);
     let tx = Arc::new(Mutex::new(mix_tx));
     let tx2 = tx.clone();
 
+    // create tokio worker thread that will dispatch events to bus
     let _ = tokio::spawn(async move {
         loop {
+            // get events that have not been published or cancelled
             let tree = TREE.get(&"tree".to_owned()).unwrap();
             let vals : HashMap<String, Event> = tree.iter().into_iter().filter(|x| {
                 let p = x.as_ref().unwrap();
@@ -471,7 +578,7 @@ pub async fn broker() {
                     let v = std::str::from_utf8(&p.1).unwrap().to_owned();
                     let evt : Event = serde_json::from_str(&v).unwrap();
                     if !evt.published && !evt.cancelled {
-                        let now = get_cloudflare_time();
+                        let now = get_ntp_time();
                         if evt.timestamp <= now  {
                             return true
                         } else {
@@ -492,6 +599,7 @@ pub async fn broker() {
                 (k, evt_cloned)
             }).collect();
 
+            // publish these filtered events to bus
             for (k, v) in vals {
                 let old_json = v.clone();
                 let old_json_clone = old_json.clone();
@@ -499,187 +607,44 @@ pub async fn broker() {
                 new_json.published = true;
                 let newest_json = new_json.clone();
                 let tree_cloned = tree.clone();
-                let tree_clone = tree.clone();
 
                 let _ = tokio::spawn(async move {
                     let _ = tree_cloned.compare_and_swap(k, Some(serde_json::to_string(&old_json_clone).unwrap().as_bytes()), Some(serde_json::to_string(&newest_json).unwrap().as_bytes())); 
                     let _ = tree_cloned.flush();
                 }).await;
 
-                let mut vals : Vec<Event> = tree_clone.iter().into_iter().filter(|x| {
-                    let p = x.as_ref().unwrap();
-                    let k = std::str::from_utf8(&p.0).unwrap().to_owned();
-                    if k.contains("_v_") {
-                        let v = std::str::from_utf8(&p.1).unwrap().to_owned();
-                        let evt : Event = serde_json::from_str(&v).unwrap();
-                        if !evt.cancelled {
-                            return true
-                        } else {
-                            return false
-                        }
-                    } else {
-                       return false
-                    }
-                }).map(|x| {
-                    let p = x.as_ref().unwrap();
-                    let v = std::str::from_utf8(&p.1).unwrap().to_owned();
-                    let evt : Event = serde_json::from_str(&v).unwrap();
-                    evt
-                }).collect();
-
-                vals.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
-
-                let mut uniques : HashSet<String> = HashSet::new();
-                for evt in &vals {
-                    uniques.insert(evt.clone().event);
-                }
-        
-                for evt in uniques {
-                    let mut events : HashMap<String, Event> = HashMap::new();
-                    for event in &vals {
-                        if evt == event.event {
-                            events.insert(event.clone().collection_id.to_string(), event.clone());
-                        }
-                    }
-                    let mut evts : Vec<Event> = Vec::new();
-                    let mut uniq_data_keys : HashSet<String> = HashSet::new();
-                    let mut rows : Vec<serde_json::Value> = Vec::new();
-                    for (_, v) in events {
-                        if v.clone().data.is_object() {
-                            evts.push(v.clone());
-                            let mut data = v.clone().data;
-                            let j = json!({"timestamp": v.clone().timestamp.to_string()});
-                            merge(&mut data, &j);
-                            let j = json!({"collection_id": v.clone().collection_id});
-                            merge(&mut data, &j);
-                            rows.push(data);
-                            for (k, _) in v.clone().data.as_object().unwrap() {
-                                uniq_data_keys.insert(k.clone());
-                            }
-                        }
-                    }
-        
-                    rows.sort_by(|a, b| a.get("timestamp").unwrap().to_string().cmp(&b.get("timestamp").unwrap().to_string()));
-                    rows.reverse();
-        
-                    let mut columns : VecDeque<serde_json::Value> = VecDeque::new();
-                    for uniq_key in uniq_data_keys {
-                        if uniq_key != "collection_id" && uniq_key != "timestamp" {
-                            columns.push_back(json!({"title": Inflector::to_sentence_case(&uniq_key), "field": uniq_key}));
-                        }
-                    }
-                    let mut cols : Vec<&serde_json::Value> = columns.iter().collect();
-                    cols.sort_by(|a, b| a.to_string().cmp(&b.to_string()));
-                    let mut colz : VecDeque<serde_json::Value> = VecDeque::new();
-                    for col in cols {
-                        colz.push_back(col.clone());
-                    }
-                    colz.push_front(json!({"title": "collection_id", "field": "collection_id"}));
-                    colz.push_front(json!({"title": "Timestamp", "field": "timestamp"}));
-
-                    let guid = Uuid::new_v4().to_string();
-                    let events_json = json!({"events": evts, "columns": colz, "rows": rows});
-                    if &evt == &new_json.event {
-                        let sse = SSE{id: guid, event: evt, data: serde_json::to_string(&events_json).unwrap(), retry: Duration::from_millis(5000)};
-                        tx2.lock().unwrap().broadcast(sse);
+                // only publish if events match - need to be published
+                for event in get_events() {
+                    if event.event == new_json.event {
+                        tx2.lock().unwrap().broadcast(event);
                     }
                 }
             }
         }  
     });
     
+    // create bus middleware
     let with_sender = warp::any().map(move || tx.clone());
 
+    // sse route
     let sse_route = warp::path("events")
         .and(auth_check)
         .and(with_sender)
         .and(warp::get()).map(move |jwt: JWT, tx_main: Arc<Mutex<bus::Bus<SSE>>>| {
 
+        // create recv for bus (each sse instance must have its own)
         let mut rx_main = tx_main.lock().unwrap().add_rx();
 
+        // create local sse channel
         let (tx, rx) = unbounded();
 
-        let tree = TREE.get(&"tree".to_owned()).unwrap();
-        let mut vals : Vec<Event> = tree.iter().into_iter().filter(|x| {
-            let p = x.as_ref().unwrap();
-            let k = std::str::from_utf8(&p.0).unwrap().to_owned();
-            if k.contains("_v_") {
-                let v = std::str::from_utf8(&p.1).unwrap().to_owned();
-                let evt : Event = serde_json::from_str(&v).unwrap();
-                if !evt.cancelled {
-                    return true
-                } else {
-                    return false
-                }
-            } else {
-                return false
-            }
-        }).map(|x| {
-            let p = x.as_ref().unwrap();
-            let v = std::str::from_utf8(&p.1).unwrap().to_owned();
-            let evt : Event = serde_json::from_str(&v).unwrap();
-            evt
-        }).collect();
-
-        vals.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
-
-        let mut uniques : HashSet<String> = HashSet::new();
-        for evt in &vals {
-            uniques.insert(evt.clone().event);
+        // loop through sse events to send on load of sse route
+        for event in get_events() {
+            let _ = tx.send(event);
         }
 
-        for evt in uniques {
-            let mut events : HashMap<String, Event> = HashMap::new();
-            for event in &vals {
-                if evt == event.event {
-                    events.insert(event.clone().collection_id.to_string(), event.clone());
-                }
-            }
-            let mut evts : Vec<Event> = Vec::new();
-            let mut uniq_data_keys : HashSet<String> = HashSet::new();
-            let mut rows : Vec<serde_json::Value> = Vec::new();
-            for (_, v) in events {
-                if v.clone().data.is_object() {
-                    evts.push(v.clone());
-                    let mut data = v.clone().data;
-                    let j = json!({"timestamp": v.clone().timestamp.to_string()});
-                    merge(&mut data, &j);
-                    let j = json!({"collection_id": v.clone().collection_id});
-                    merge(&mut data, &j);
-                    rows.push(data);
-                    for (k, _) in v.clone().data.as_object().unwrap() {
-                        uniq_data_keys.insert(k.clone());
-                    }
-                }
-            }
-
-            rows.sort_by(|a, b| a.get("timestamp").unwrap().to_string().cmp(&b.get("timestamp").unwrap().to_string()));
-            rows.reverse();
-
-            let mut columns : VecDeque<serde_json::Value> = VecDeque::new();
-            for uniq_key in uniq_data_keys {
-                if uniq_key != "collection_id" && uniq_key != "timestamp" {
-                    columns.push_back(json!({"title": Inflector::to_sentence_case(&uniq_key), "field": uniq_key}));
-                }
-            }
-
-            let mut cols : Vec<&serde_json::Value> = columns.iter().collect();
-            cols.sort_by(|a, b| a.to_string().cmp(&b.to_string()));
-            let mut colz : VecDeque<serde_json::Value> = VecDeque::new();
-            for col in cols {
-                colz.push_back(col.clone());
-            }
-            colz.push_front(json!({"title": "collection_id", "field": "collection_id"}));
-            colz.push_front(json!({"title": "Timestamp", "field": "timestamp"}));
-
-            let guid = Uuid::new_v4().to_string();
-            let events_json = json!({"events": evts, "columns": colz, "rows": rows});
-            let sse = SSE{id: guid, event: evt, data: serde_json::to_string(&events_json).unwrap(), retry: Duration::from_millis(5000)};
-            let _ = tx.send(sse);
-        }
-
+        // every 100ms check the bus and if any messages send to local channel also check local channel and publish to stream (sse route)
         let event_stream = interval(Duration::from_millis(100)).map(move |_| {
-
             let sse = match rx_main.try_recv() {
                 Ok(sse) => sse,
                 Err(_) => {
@@ -689,13 +654,12 @@ pub async fn broker() {
                 }
             };
             let _ = tx.send(sse);
-
             event_stream(rx.clone(), jwt.check)
         });
-        
         warp::sse::reply(event_stream)
     });
 
+    // cancel route
     let cancel_route = warp::get()
         .and(warp::path("cancel"))
         .and(auth_check)
@@ -712,6 +676,7 @@ pub async fn broker() {
             }
         });
 
+    // collections route
     let collections_route = warp::get()
         .and(warp::path("collections"))
         .and(auth_check)
@@ -728,6 +693,7 @@ pub async fn broker() {
             }
         });
 
+    // user collection route
     let user_collection_route = warp::get()
         .and(warp::path("user_events"))
         .and(auth_check)
@@ -743,10 +709,13 @@ pub async fn broker() {
             }
         });
 
+    // create cors wrapper
     let configure = config();
     let cors = warp::cors().allow_origin(&*configure.origin).allow_methods(vec!["GET", "POST"]).allow_headers(vec![warp::http::header::AUTHORIZATION, warp::http::header::CONTENT_TYPE]);
 
+    // create routes
     let routes = warp::any().and(login_route).or(user_create_route).or(insert_route).or(sse_route).or(cancel_route).or(collections_route).or(user_collection_route).with(cors);
 
+    // start server
     warp::serve(routes).run(([0, 0, 0, 0], 8080)).await
 }
