@@ -11,21 +11,13 @@ use jsonwebtoken::{encode, decode, Header, Validation, EncodingKey, DecodingKey}
 use std::convert::Infallible;
 use std::time::Duration;
 use lazy_static::lazy_static;
+use bus::Bus;
 use crossbeam::channel::unbounded;
 use inflector::Inflector;
 use json_patch::merge;
+use std::sync::{Arc, Mutex};
 
 lazy_static! {
-    static ref CHANNEL: HashMap<String, (crossbeam::channel::Sender<SSE>, crossbeam::channel::Receiver<SSE>)> = {
-        let (tx, rx) = unbounded();
-        let guid = Uuid::new_v4().to_string();
-        let sse = SSE{id: guid, event: "internal_status".to_owned(), data: "connected".to_owned(), retry: Duration::from_millis(5000)};
-        let _ = tx.send(sse);
-        let mut m = HashMap::new();
-        m.insert("chan".to_owned(), (tx, rx));
-        m
-    };
-
     static ref TREE: HashMap<String, sled::Db> = {
         let configure = config();
         let tree = sled::open(configure.save_path).unwrap();
@@ -379,10 +371,9 @@ fn insert(tree: sled::Db, user_id_str: String, evt: EventForm) -> String {
     json!({"event": j}).to_string()
 }
 
-fn event_stream(allowed: bool) -> Result<impl ServerSentEvent, Infallible> {
+fn event_stream(rx: crossbeam::channel::Receiver<SSE>, allowed: bool) -> Result<impl ServerSentEvent, Infallible> {
  
     if allowed {
-        let (_, rx) = CHANNEL.get(&"chan".to_owned()).unwrap();
         let sse = match rx.try_recv() {
             Ok(sse) => sse,
             Err(_) => {
@@ -464,6 +455,11 @@ pub async fn broker() {
                 warp::reply::with_header(reply, "Content-Type", "application/json")
             }
         });
+
+    // set up fan-out
+    let mix_tx = Bus::new(100);
+    let tx = Arc::new(Mutex::new(mix_tx));
+    let tx2 = tx.clone();
 
     let _ = tokio::spawn(async move {
         loop {
@@ -583,17 +579,26 @@ pub async fn broker() {
 
                     let guid = Uuid::new_v4().to_string();
                     let events_json = json!({"events": evts, "columns": colz, "rows": rows});
-                    let sse = SSE{id: guid, event: evt, data: serde_json::to_string(&events_json).unwrap(), retry: Duration::from_millis(5000)};
-                    let (tx, _) = CHANNEL.get(&"chan".to_owned()).unwrap();
-                    let _ = tx.send(sse);
+                    if &evt == &new_json.event {
+                        let sse = SSE{id: guid, event: evt, data: serde_json::to_string(&events_json).unwrap(), retry: Duration::from_millis(5000)};
+                        tx2.lock().unwrap().broadcast(sse);
+                    }
                 }
             }
         }  
     });
     
+    let with_sender = warp::any().map(move || tx.clone());
+
     let sse_route = warp::path("events")
         .and(auth_check)
-        .and(warp::get()).map(move |jwt: JWT| {
+        .and(with_sender)
+        .and(warp::get()).map(move |jwt: JWT, tx_main: Arc<Mutex<bus::Bus<SSE>>>| {
+
+        let mut rx_main = tx_main.lock().unwrap().add_rx();
+
+        let (tx, rx) = unbounded();
+
         let tree = TREE.get(&"tree".to_owned()).unwrap();
         let mut vals : Vec<Event> = tree.iter().into_iter().filter(|x| {
             let p = x.as_ref().unwrap();
@@ -670,12 +675,22 @@ pub async fn broker() {
             let guid = Uuid::new_v4().to_string();
             let events_json = json!({"events": evts, "columns": colz, "rows": rows});
             let sse = SSE{id: guid, event: evt, data: serde_json::to_string(&events_json).unwrap(), retry: Duration::from_millis(5000)};
-            let (tx, _) = CHANNEL.get(&"chan".to_owned()).unwrap();
             let _ = tx.send(sse);
         }
 
-        let event_stream = interval(Duration::from_millis(100)).map(move |_| {
-            event_stream(jwt.check)
+        let event_stream = interval(Duration::from_millis(1000)).map(move |_| {
+
+            let sse = match rx_main.try_recv() {
+                Ok(sse) => sse,
+                Err(_) => {
+                    let guid = Uuid::new_v4().to_string();
+                    let polling = json!({"status": "polling"});
+                    SSE{id: guid, event: "internal_status".to_owned(), data: polling.to_string(), retry: Duration::from_millis(5000)}
+                }
+            };
+            let _ = tx.send(sse);
+
+            event_stream(rx.clone(), jwt.check)
         });
         
         warp::sse::reply(event_stream)
