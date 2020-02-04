@@ -16,6 +16,7 @@ use crossbeam::channel::unbounded;
 use inflector::Inflector;
 use json_patch::merge;
 use std::sync::{Arc, Mutex};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 // init database as lazy
 lazy_static! {
@@ -59,7 +60,7 @@ pub struct SSE {
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct Config {
-  pub port: String,
+  pub port: u16,
   pub expiry: i64,
   pub origin: String,
   pub secret: String,
@@ -413,7 +414,7 @@ fn login(tree: sled::Db, login: Login, config: Config) -> (bool, String) {
 // config based on sane local dev defaults (uses double dashes for flags)
 fn config() -> Config {
  
-    let mut port = "8080".to_owned();
+    let mut port : u16 = 8080;
     let mut expiry : i64 = 3600;
     let mut origin = "http://localhost:3000".to_owned();
     let mut secret = "secret".to_owned();
@@ -717,5 +718,6 @@ pub async fn broker() {
     let routes = warp::any().and(login_route).or(user_create_route).or(insert_route).or(sse_route).or(cancel_route).or(collections_route).or(user_collection_route).with(cors);
 
     // start server
-    warp::serve(routes).run(([0, 0, 0, 0], 8080)).await
+    let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), configure.port);
+    warp::serve(routes).run(socket).await
 }

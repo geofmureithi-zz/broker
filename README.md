@@ -172,7 +172,7 @@ pub async fn main() {
 - the expiry (for jwts) needs to be passed in as a flag
 - the secret (for jwts) needs to be passed in as a flag
 - the save_path where the embedded database will save needs to be passed in as an environment variable
-- example: SAVE_PATH=./tmp/broker_data broker -port 8080 -origin http://localhost:3000 -expiry 3600 -secret secret
+- example: SAVE_PATH=./tmp/broker_data broker --port 8080 --origin http://localhost:3000 --expiry 3600 --secret secret
 
 ### Install Crate
 
@@ -182,7 +182,7 @@ pub async fn main() {
 - the expiry (for jwts) needs to be passed in as a flag
 - the secret (for jwts) needs to be passed in as a flag
 - the save_path where the embedded database will save needs to be passed in as an environment variable
-- example: SAVE_PATH=./tmp/broker_data broker -port 8080 -origin http://localhost:3000 -expiry 3600 -secret secret
+- example: SAVE_PATH=./tmp/broker_data broker --port 8080 --origin http://localhost:3000 --expiry 3600 --secret secret
 
 ### Install Linux Snap
 
@@ -193,7 +193,7 @@ pub async fn main() {
 - the port needs to be passed in as a flag
 - the expiry (for jwts) needs to be passed in as a flag
 - the secret (for jwts) needs to be passed in as a flag
-- example: sudo broker -port 8080 -origin http://localhost:3000 -expiry 3600 -secret secret
+- example: sudo broker -port 8080 --origin http://localhost:3000 --expiry 3600 --secret secret
 
 ### Under the Hood
 
