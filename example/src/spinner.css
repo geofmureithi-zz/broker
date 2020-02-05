@@ -9,8 +9,8 @@
     top: calc(50% - (1em / 2));
     left: calc(50% - (1em / 2));
     display: block;
-    width: 1em;
-    height: 1em;
+    width: 7em;
+    height: 7em;
     border: 2px solid currentColor;
     border-radius: 9999px;
     border-right-color: transparent;
