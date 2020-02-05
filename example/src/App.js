@@ -6,36 +6,19 @@ import {
   Route
 } from "react-router-dom";
 import { useForm } from "react-hook-form";
-import { Input, Button } from '@material-ui/core';
-import { makeStyles } from '@material-ui/core/styles';
-import Card from '@material-ui/core/Card';
-import CardContent from '@material-ui/core/CardContent';
-import CardHeader from '@material-ui/core/CardHeader';
 import Logo from './logo.svg';
 import uuid from 'uuid/v4';
-
-const useStyles = makeStyles({
-  card: {
-    minWidth: "275px",
-    width: "100%"
-  },
-  title: {
-    fontSize: 14,
-  },
-  pos: {
-    marginBottom: 12,
-  },
-});
+import './tailwind.css';
+import './spinner.css';
 
 function Insert(props) {
-  const classes = useStyles();
   const { handleSubmit, register } = useForm();
   const stamp = Math.floor(Date.now() / 1000);
   const id = uuid();
   const onSubmit = values => {
     const apiEndpoint = process.env.REACT_APP_API + '/insert';
     const vals = JSON.stringify(values);
-    const v = `{"collection_id": "${id}", "event": "baby", "timestamp": ${stamp}, "data": ${vals} }`;
+    const v = `{"collection_id": "${id}", "event": "demo", "timestamp": ${stamp}, "data": ${vals} }`;
     fetch(apiEndpoint, {
       method: 'post',
       mode: 'cors',
@@ -51,45 +34,51 @@ function Insert(props) {
     });
   };
   return (
-    <Card className={classes.card} raised={true} style={{marginTop: "50px"}}>
-    <CardContent>
-      <img src={Logo} alt="logo" />
-      <CardHeader title="Client's Info" style={{marginTop: "25px"}} />
-      <form onSubmit={handleSubmit(onSubmit)}>
-        <span style={{marginLeft: "25px"}}>
-          <Input
-            inputRef={register}
+    <form class="w-full max-w-sm mx-20" onSubmit={handleSubmit(onSubmit)}>
+      <img src={Logo} alt="logo" class="mb-10 mt-5" />
+      <div class="md:flex md:items-center mb-6">
+        <div class="md:w-2/3">
+          <input
+            ref={register}
             name="client_name"
             placeholder="Client's Full Name"
-            required={true}
+            class="bg-gray-200 appearance-none border-2 border-gray-200 rounded w-full py-2 px-4 text-gray-700 leading-tight focus:outline-none focus:bg-white focus:border-purple-500"
           />
-        </span>
-        <span style={{marginLeft: "25px"}}>
-          <Input
-            inputRef={register}
+        </div>
+      </div>
+      <div class="md:flex md:items-center mb-6">
+        <div class="md:w-2/3">
+          <input
+            ref={register}
             name="client_phone_number"
             placeholder="Client's Phone #"
-            required={true}
+            class="bg-gray-200 appearance-none border-2 border-gray-200 rounded w-full py-2 px-4 text-gray-700 leading-tight focus:outline-none focus:bg-white focus:border-purple-500"
           />
-        </span>
-        <span style={{marginLeft: "25px"}}>
-          <Input
-            inputRef={register}
+        </div>
+      </div>
+      <div class="md:flex md:items-center mb-6">
+        <div class="md:w-2/3">
+          <input
+            ref={register}
             name="client_email"
             placeholder="Client's Email"
-            required={true}
+            class="bg-gray-200 appearance-none border-2 border-gray-200 rounded w-full py-2 px-4 text-gray-700 leading-tight focus:outline-none focus:bg-white focus:border-purple-500"
           />
-        </span>
-        <div style={{marginTop: "50px"}}>
-          <Button variant="contained" color="primary" type="submit">Submit</Button>
         </div>
-      </form>
-    </CardContent>
-  </Card>);
+      </div>
+      <div class="md:flex md:items-center">
+        <div class="md:w-1/3"></div>
+        <div class="md:w-2/3">
+          <button class="shadow bg-teal-500 hover:bg-teal-400 focus:shadow-outline focus:outline-none text-white font-bold py-2 px-4 rounded" type="submit">
+            Submit
+          </button>
+        </div>
+      </div>
+    </form>
+  );
 }
 
 function Load(props) {
-  const classes = useStyles();
   const { handleSubmit, register, errors } = useForm();
 
   return (
@@ -98,15 +87,15 @@ function Load(props) {
         <Switch>
           <Route path="/">
             <Insert jwt={props.jwt} />
-            <Card className={classes.card} raised={true} style={{marginTop: "50px"}}>
-              <CardContent>
-                {props.jwt.length > 0 && 
-                  <div style={{marginTop: "50px"}}>
-                    <Grid endpoint={process.env.REACT_APP_API} eventListen={'baby'} title={'Client Info'} token={props.jwt} />
-                  </div>
-                }
-            </CardContent>
-          </Card>
+              { props.jwt.length == 0 && 
+                <div class="spinner mt-20">
+                </div>
+              }
+              {props.jwt.length > 0 && 
+                <div class="mt-20 mx-20">
+                  <Grid endpoint={process.env.REACT_APP_API} eventListen={'demo'} title={'Client Info'} token={props.jwt} />
+                </div>
+              }
           </Route>
         </Switch>
       </div>
