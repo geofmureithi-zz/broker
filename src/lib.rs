@@ -65,6 +65,9 @@ pub struct Config {
   pub origin: String,
   pub secret: String,
   pub save_path: String,
+  pub connection: String,
+  pub cert_path: String,
+  pub key_path: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -416,13 +419,19 @@ fn config() -> Config {
  
     let mut port : u16 = 8080;
     let mut expiry : i64 = 3600;
+    let mut connection = "http".to_owned();
     let mut origin = "http://localhost:3000".to_owned();
     let mut secret = "secret".to_owned();
+    let mut key_path = "./broker.rsa".to_owned();
+    let mut cert_path = "./broker.pem".to_owned();
     let _ : Vec<String> = go_flag::parse(|flags| {
         flags.add_flag("port", &mut port);
         flags.add_flag("origin", &mut origin);
         flags.add_flag("expiry", &mut expiry);
         flags.add_flag("secret", &mut secret);
+        flags.add_flag("connection", &mut connection);
+        flags.add_flag("key-path", &mut key_path);
+        flags.add_flag("cert-path", &mut cert_path);
     });
 
     let save_path = match envy::from_env::<Cfg>() {
@@ -430,7 +439,7 @@ fn config() -> Config {
         Err(_) => "./tmp/broker_data".to_owned()
     };
 
-    Config{port: port, secret: secret, origin: origin, save_path: save_path, expiry: expiry}
+    Config{port: port, secret: secret, origin: origin, save_path: save_path, expiry: expiry, connection: connection, key_path: key_path, cert_path: cert_path}
 }
 
 // verify the exp and key of the JWT
@@ -717,7 +726,17 @@ pub async fn broker() {
     // create routes
     let routes = warp::any().and(login_route).or(user_create_route).or(insert_route).or(sse_route).or(cancel_route).or(collections_route).or(user_collection_route).with(cors);
 
-    // start server
+    // set ip and port
     let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), configure.port);
-    warp::serve(routes).run(socket).await
+
+    // start server based on https or http
+    if configure.connection == "https" {
+        return warp::serve(routes)
+            .tls()
+            .cert_path(&configure.cert_path)
+            .key_path(&configure.key_path)
+            .run(socket).await
+    } else {
+       return warp::serve(routes).run(socket).await
+    }
 }

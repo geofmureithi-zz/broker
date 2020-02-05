@@ -1,7 +1,6 @@
 ## Broker - Real-time BaaS (Backend as a Service)
 
 [![crates.io](https://meritbadge.herokuapp.com/broker)](https://crates.io/crates/broker)
-[![broker](https://snapcraft.io//broker/badge.svg)](https://snapcraft.io/broker)
 
 ### Purpose
 
@@ -16,10 +15,10 @@ Broker follows an insert-only/publish/subscribe paradigm rather than a REST CRUD
 ### Features
 
 * Very performant with a low memory footprint that uses about 20MB and 1 CPU thread
-* About 500 lines of code
-* Ships as a [Linux Snap](https://snapcraft.io/broker) or [Rust Crate](https://crates.io/crates/broker)
+* About 500 lines of codeå
 * Secure Real-time Event Stream via SSE - requires the use of [broker-client](https://www.npmjs.com/package/broker-client)
 * Has CORS support
+* Supports SSL
 * Provides user authentication with JWTs and Bcrypt(ed) passwords
 * Handles future events via Epoch UNIX timestamp
 * Uses Global NTP (Cloudflare & Pool) and doesn't rely on your local server time
@@ -167,33 +166,18 @@ pub async fn main() {
     broker().await
 }
 ```
-- the origin needs to be passed in as a flag - wildcard is not supported
-- the port needs to be passed in as a flag
-- the expiry (for jwts) needs to be passed in as a flag
-- the secret (for jwts) needs to be passed in as a flag
-- the save_path where the embedded database will save needs to be passed in as an environment variable
-- example: SAVE_PATH=./tmp/broker_data broker --port 8080 --origin http://localhost:3000 --expiry 3600 --secret secret
-
-### Install Crate
-
+OR
 ``` cargo install broker ```
-- the origin needs to be passed in as a flag - wildcard is not supported
-- the port needs to be passed in as a flag
-- the expiry (for jwts) needs to be passed in as a flag
-- the secret (for jwts) needs to be passed in as a flag
+
+- the origin needs to be passed in as a flag - wildcard is not supported - default http://localhost:3000
+- the port needs to be passed in as a flag - default 8080
+- the expiry (for jwts) needs to be passed in as a flag - default 3600
+- the secret (for jwts) needs to be passed in as a flag - default secret
+- the conection needs to passed in as a flag (http or https) - default http
+- the key-path needs to passed in as a flag if connection https - default ./broker.rsa
+- the cert-path needs to passed in as a flag if connection https - default ./broker.pem
 - the save_path where the embedded database will save needs to be passed in as an environment variable
-- example: SAVE_PATH=./tmp/broker_data broker --port 8080 --origin http://localhost:3000 --expiry 3600 --secret secret
-
-### Install Linux Snap
-
-``` sudo snap install broker ```
-- note: does not run as a daemon as requires flags
-- the origin needs to be passed in as a flag - wildcard is not supported
-- the snap saves the database in [$SNAP_DATA/broker_data](https://snapcraft.io/docs/environment-variables) - which is /var/snap/broker/{rev#}/broker_data - where rev# is the revision number
-- the port needs to be passed in as a flag
-- the expiry (for jwts) needs to be passed in as a flag
-- the secret (for jwts) needs to be passed in as a flag
-- example: sudo broker -port 8080 --origin http://localhost:3000 --expiry 3600 --secret secret
+- example: SAVE_PATH=./tmp/broker_data broker --port 8080 --connection https --origin http://localhost:3000 --expiry 3600 --secret secret --key-path ./broker.rsa --cert-path ./broker.pem
 
 ### Under the Hood
 
