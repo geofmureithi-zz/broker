@@ -15,13 +15,13 @@ Broker follows an insert-only/publish/subscribe paradigm rather than a REST CRUD
 ### Features
 
 * Very performant with a low memory footprint that uses about 20MB and 1 CPU thread
-* About 500 lines of codeå
+* About 500 lines of code
 * Secure Real-time Event Stream via SSE - requires the use of [broker-client](https://www.npmjs.com/package/broker-client)
-* Has CORS support
+* Supports CORS
 * Supports SSL
 * Provides user authentication with JWTs and Bcrypt(ed) passwords
 * Handles future events via Epoch UNIX timestamp
-* Uses Global NTP (Cloudflare & Pool) and doesn't rely on your local server time
+* Uses Global NTP servers and doesn't rely on your local server time
 * Stateful immutable event persistence
 * Insert event via JSON POST request 
 * Sync latest events on SSE client connection
