@@ -17,8 +17,7 @@ import uuid from 'uuid/v4';
 const useStyles = makeStyles({
   card: {
     minWidth: "275px",
-    margin: "0 auto",
-    width: "900px"
+    width: "100%"
   },
   title: {
     fontSize: 14,
