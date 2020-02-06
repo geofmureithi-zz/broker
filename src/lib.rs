@@ -618,12 +618,12 @@ pub async fn broker() {
                 let newest_json = new_json.clone();
                 let tree_cloned = tree.clone();
 
+                let _ = tree_cloned.compare_and_swap(k, Some(serde_json::to_string(&old_json_clone).unwrap().as_bytes()), Some(serde_json::to_string(&newest_json).unwrap().as_bytes())); 
+                let _ = tree_cloned.flush();
+
                 // only publish if events match - need to be published
                 for event in get_events() {
-                    let key = k.clone();
                     if event.event == new_json.event {
-                        let _ = tree_cloned.compare_and_swap(key, Some(serde_json::to_string(&old_json_clone).unwrap().as_bytes()), Some(serde_json::to_string(&newest_json).unwrap().as_bytes())); 
-                        let _ = tree_cloned.flush();
                         tx2.lock().unwrap().broadcast(event);
                     }
                 }
