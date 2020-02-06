@@ -576,62 +576,62 @@ pub async fn broker() {
     let tx = Arc::new(Mutex::new(mix_tx));
     let tx2 = tx.clone();
 
-    // create tokio worker thread that will dispatch events to bus
-    let _ = tokio::spawn(async move {
-        loop {
-            // get events that have not been published or cancelled
-            let tree = TREE.get(&"tree".to_owned()).unwrap();
-            let vals : HashMap<String, Event> = tree.iter().into_iter().filter(|x| {
-                let p = x.as_ref().unwrap();
-                let k = std::str::from_utf8(&p.0).unwrap().to_owned();
-                if k.contains("_v_") {
-                    let v = std::str::from_utf8(&p.1).unwrap().to_owned();
-                    let evt : Event = serde_json::from_str(&v).unwrap();
-                    if !evt.published && !evt.cancelled {
-                        let now = get_ntp_time();
-                        if evt.timestamp <= now  {
-                            return true
-                        } else {
-                            return false
-                        }
-                    } else {
-                        return false
-                    }
-                } else {
-                    return false
-                }
-            }).map(|x| {
-                let p = x.as_ref().unwrap();
-                let k = std::str::from_utf8(&p.0).unwrap().to_owned();
-                let v = std::str::from_utf8(&p.1).unwrap().to_owned();
-                let evt : Event = serde_json::from_str(&v).unwrap();
-                let evt_cloned = evt.clone();
-                (k, evt_cloned)
-            }).collect();
+    // // create tokio worker thread that will dispatch events to bus
+    // let _ = tokio::spawn(async move {
+    //     loop {
+    //         // get events that have not been published or cancelled
+    //         let tree = TREE.get(&"tree".to_owned()).unwrap();
+    //         let vals : HashMap<String, Event> = tree.iter().into_iter().filter(|x| {
+    //             let p = x.as_ref().unwrap();
+    //             let k = std::str::from_utf8(&p.0).unwrap().to_owned();
+    //             if k.contains("_v_") {
+    //                 let v = std::str::from_utf8(&p.1).unwrap().to_owned();
+    //                 let evt : Event = serde_json::from_str(&v).unwrap();
+    //                 if !evt.published && !evt.cancelled {
+    //                     let now = get_ntp_time();
+    //                     if evt.timestamp <= now  {
+    //                         return true
+    //                     } else {
+    //                         return false
+    //                     }
+    //                 } else {
+    //                     return false
+    //                 }
+    //             } else {
+    //                 return false
+    //             }
+    //         }).map(|x| {
+    //             let p = x.as_ref().unwrap();
+    //             let k = std::str::from_utf8(&p.0).unwrap().to_owned();
+    //             let v = std::str::from_utf8(&p.1).unwrap().to_owned();
+    //             let evt : Event = serde_json::from_str(&v).unwrap();
+    //             let evt_cloned = evt.clone();
+    //             (k, evt_cloned)
+    //         }).collect();
 
-            // publish these filtered events to bus
-            for (k, v) in vals {
-                let old_json = v.clone();
-                let old_json_clone = old_json.clone();
-                let mut new_json = v.clone();
-                new_json.published = true;
-                let newest_json = new_json.clone();
-                let tree_cloned = tree.clone();
+    //         // publish these filtered events to bus
+    //         for (k, v) in vals {
+    //             let old_json = v.clone();
+    //             let old_json_clone = old_json.clone();
+    //             let mut new_json = v.clone();
+    //             new_json.published = true;
+    //             let newest_json = new_json.clone();
+    //             let tree_cloned = tree.clone();
 
-                let _ = tokio::spawn(async move {
-                    let _ = tree_cloned.compare_and_swap(k, Some(serde_json::to_string(&old_json_clone).unwrap().as_bytes()), Some(serde_json::to_string(&newest_json).unwrap().as_bytes())); 
-                    let _ = tree_cloned.flush();
-                }).await;
+    //             let _ = tokio::spawn(async move {
+    //                 let _ = tree_cloned.compare_and_swap(k, Some(serde_json::to_string(&old_json_clone).unwrap().as_bytes()), Some(serde_json::to_string(&newest_json).unwrap().as_bytes())); 
+    //                 let _ = tree_cloned.flush();
+    //             }).await;
 
-                // only publish if events match - need to be published
-                for event in get_events() {
-                    if event.event == new_json.event {
-                        tx2.lock().unwrap().broadcast(event);
-                    }
-                }
-            }
-        }  
-    });
+    //             // only publish if events match - need to be published
+    //             for event in get_events() {
+    //                 if event.event == new_json.event {
+    //                     tx2.lock().unwrap().broadcast(event);
+    //                 }
+    //             }
+    //         }
+    //     }  
+    // });
     
     // create bus middleware
     let with_sender = warp::any().map(move || tx.clone());
