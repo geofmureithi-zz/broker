@@ -579,8 +579,8 @@ pub async fn broker() {
     // create tokio worker thread that will dispatch events to bus
     let _ = tokio::spawn(async move {
         loop {
-            let wait = Duration::from_millis(100);
-            std::thread::sleep(wait);
+            // let wait = Duration::from_millis(100);
+            // std::thread::sleep(wait);
             // get events that have not been published or cancelled
             let tree = TREE.get(&"tree".to_owned()).unwrap();
             let vals : HashMap<String, Event> = tree.iter().into_iter().filter(|x| {
