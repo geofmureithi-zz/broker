@@ -28,6 +28,10 @@ Broker follows an insert-only/publish/subscribe paradigm rather than a REST CRUD
 * Event log via GET request
 * Event cancellation via GET request
 
+### Demo
+
+[Demo](https://broker.apibill.me/)
+
 ### How it works
 
 In Broker you create a user, login, then insert an event with its data, a collection_id, and a timestamp. Broker publishes the event when the timestamp is reached to the event stream via SSE. Broker keeps all events its database that can be viewed in collections (by collection_id). Broker can also cancel future events.
