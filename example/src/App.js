@@ -18,7 +18,7 @@ function Insert(props) {
   const onSubmit = values => {
     const apiEndpoint = process.env.REACT_APP_API + '/insert';
     const vals = JSON.stringify(values);
-    const v = `{"collection_id": "${id}", "event": "demo", "timestamp": ${stamp}, "data": ${vals} }`;
+    const v = `{"collection_id": "${id}", "event": "covid", "timestamp": ${stamp}, "data": ${vals} }`;
     fetch(apiEndpoint, {
       method: 'post',
       mode: 'cors',
@@ -40,8 +40,8 @@ function Insert(props) {
         <div class="md:w-2/3">
           <input
             ref={register}
-            name="client_name"
-            placeholder="Client's Full Name"
+            name="Username"
+            placeholder="Username"
             class="bg-gray-200 appearance-none border-2 border-gray-200 rounded w-full py-2 px-4 text-gray-700 leading-tight focus:outline-none focus:bg-white focus:border-purple-500"
           />
         </div>
@@ -50,8 +50,8 @@ function Insert(props) {
         <div class="md:w-2/3">
           <input
             ref={register}
-            name="client_phone_number"
-            placeholder="Client's Phone #"
+            name="message"
+            placeholder="Message"
             class="bg-gray-200 appearance-none border-2 border-gray-200 rounded w-full py-2 px-4 text-gray-700 leading-tight focus:outline-none focus:bg-white focus:border-purple-500"
           />
         </div>
@@ -60,8 +60,8 @@ function Insert(props) {
         <div class="md:w-2/3">
           <input
             ref={register}
-            name="client_email"
-            placeholder="Client's Email"
+            name="location"
+            placeholder="Location"
             class="bg-gray-200 appearance-none border-2 border-gray-200 rounded w-full py-2 px-4 text-gray-700 leading-tight focus:outline-none focus:bg-white focus:border-purple-500"
           />
         </div>
@@ -93,7 +93,7 @@ function Load(props) {
               }
               {props.jwt.length > 0 && 
                 <div class="mt-20 mx-20">
-                  <Grid endpoint={process.env.REACT_APP_API} eventListen={'demo'} title={'Client Info'} token={props.jwt} />
+                  <Grid endpoint={process.env.REACT_APP_API} eventListen={'covid'} title={'Fight Covid'} token={props.jwt} />
                 </div>
               }
           </Route>
