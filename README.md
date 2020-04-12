@@ -14,12 +14,12 @@ Broker follows an insert-only/publish/subscribe paradigm rather than a REST CRUD
 
 ### Features
 
-* Very performant with a low memory footprint that uses about 20MB and 1 CPU thread
-* About 500 lines of code
+* Very performant with a low memory footprint that uses about 20MB and 2 CPU threads
+* Under 1,000 lines of code
 * Secure Real-time Event Stream via SSE - requires the use of [broker-client](https://www.npmjs.com/package/broker-client)
 * Supports CORS
-* Supports SSL
-* Provides user authentication with JWTs and Bcrypt(ed) passwords
+* Supports SSL - full end-to-end encryption
+* Provides user authentication with JWTs or HTTP Basic with stored Bcrypt(ed) passwords
 * Handles future events via Epoch UNIX timestamp
 * Uses Global NTP servers and doesn't rely on your local server time
 * Stateful immutable event persistence
@@ -73,7 +73,7 @@ will return
 ```
 - where {...} is the uuid (string) of the user
 
-#### Step 2 - login with the user
+#### For JWT Auth: Step 2 - login with the user
 
 ```html
 POST /login 
@@ -96,7 +96,7 @@ will return
 ```html 
 GET /events 
 ```
-- authenticated endpoint (Authorization: Bearer {jwt})
+- authenticated endpoint (Authorization: Bearer {jwt}) or (Authorization: Basic {base64})
 - connect your sse-client to this endpoint using [broker-client](https://www.npmjs.com/package/broker-client)
 - note: broker-client uses fetch as eventsource doesn't support headers
 
@@ -105,7 +105,7 @@ GET /events
 ```html
 POST /insert 
 ```
-- authenticated endpoint (Authorization: Bearer {jwt})
+- authenticated endpoint (Authorization: Bearer {jwt}) or (Authorization: Basic {base64})
 - POST JSON to insert an event
 ```json
 {"event":{...}, "collection_id":{...}, "timestamp":{...}, "data":{...}}
@@ -123,7 +123,7 @@ will return
 ```html
 GET /collections/{collection_id}
 ```
-- authenticated endpoint (Authorization: Bearer {jwt})
+- authenticated endpoint (Authorization: Bearer {jwt}) or (Authorization: Basic {base64})
 - do a GET request where {collection_id} is the uuid of the collection you want (sorted by ascending timestamp)
 
 will return
@@ -135,7 +135,7 @@ will return
 ```html
 GET /user_events
 ``` 
-- authenticated endpoint (Authorization: Bearer {jwt})
+- authenticated endpoint (Authorization: Bearer {jwt}) or (Authorization: Basic {base64})
 - do a GET request to get the user event collections (sorted by ascending timestamp)
 
 will return
@@ -147,7 +147,7 @@ will return
 ```html
 GET /cancel/{id}
 ``` 
-- authenticated endpoint (Authorization: Bearer {jwt})
+- authenticated endpoint (Authorization: Bearer {jwt}) or (Authorization: Basic {base64})
 - do a GET request where id is the uuid of the event to cancel a future event
 
 will return

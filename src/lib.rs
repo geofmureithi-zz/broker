@@ -17,6 +17,7 @@ use inflector::Inflector;
 use json_patch::merge;
 use std::sync::{Arc, Mutex};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use base64::{decode as base64_decode};
 
 // init database as lazy
 lazy_static! {
@@ -442,21 +443,72 @@ fn config() -> Config {
     Config{port: port, secret: secret, origin: origin, save_path: save_path, expiry: expiry, connection: connection, key_path: key_path, cert_path: cert_path}
 }
 
-// verify the exp and key of the JWT
+// verify the exp and key of the JWT or the HTTP Basic Username/Password
 fn jwt_verify(config: Config, token: String) -> JWT {
   
-    let parts = token.split(" ");
-    for part in parts {
-        if part != "Bearer" {
-            let _ = match decode::<Claims>(&part,  &DecodingKey::from_secret(config.secret.as_ref()), &Validation::default()) {
-                Ok(c) => {
-                    return JWT{check: true, claims: c.claims}
-                },
-                Err(_e) => {
-                    return JWT{check: false, claims: Claims{company: "".to_owned(), exp: 0, sub: "".to_owned()}}
-                }
-            };
-        }
+    let mut parts = token.split(" ");
+    let auth_type = parts.next().unwrap();
+    if auth_type == "Bearer" {
+        let token = parts.next().unwrap();
+        let _ = match decode::<Claims>(&token,  &DecodingKey::from_secret(config.secret.as_ref()), &Validation::default()) {
+            Ok(c) => {
+                return JWT{check: true, claims: c.claims};
+            },
+            Err(_) => {
+                return JWT{check: false, claims: Claims{company: "".to_owned(), exp: 0, sub: "".to_owned()}};
+            }
+        };
+    } else if auth_type == "Basic" {
+        let token = parts.next().unwrap();
+        let _ = match &base64_decode(token) {
+            Ok(c) => {
+                let _ = match std::str::from_utf8(&c) {
+                    Ok(d) => {
+                        let mut username_password = d.split(":");
+                        let username = username_password.next().unwrap();
+                        let password = username_password.next().unwrap();
+                        let tree = TREE.get(&"tree".to_owned()).unwrap();
+
+                        let records : HashMap<String, String> = tree.iter().into_iter().filter(|x| {
+                            let p = x.as_ref().unwrap();
+                            let k = std::str::from_utf8(&p.0).unwrap().to_owned();
+                            if k.contains(&"_u_") {
+                                let v = std::str::from_utf8(&p.1).unwrap().to_owned();
+                                let user : User = serde_json::from_str(&v).unwrap();
+                                if user.username == username {
+                                    return true
+                                } else {
+                                    return false
+                                }
+                            } else {
+                                return false
+                            }
+                        }).map(|x| {
+                            let p = x.unwrap();
+                            let k = std::str::from_utf8(&p.0).unwrap().to_owned();
+                            let v = std::str::from_utf8(&p.1).unwrap().to_owned();
+                            (k, v)
+                        }).collect();
+                    
+                        for (_k, v) in records {
+                            let user : User = serde_json::from_str(&v).unwrap();
+                            let verified = verify(password, &user.password).unwrap();
+                            if verified {
+                                return JWT{check: true, claims: Claims{company: "".to_owned(), exp: 0, sub: user.id.to_string()}};
+                            } else {
+                                return JWT{check: false, claims: Claims{company: "".to_owned(), exp: 0, sub: "".to_owned()}};
+                            }
+                        }
+                    },
+                    Err(_) => {
+                        return JWT{check: false, claims: Claims{company: "".to_owned(), exp: 0, sub: "".to_owned()}};
+                    }
+                };
+            },
+            Err(_) => {
+                return JWT{check: false, claims: Claims{company: "".to_owned(), exp: 0, sub: "".to_owned()}};
+            }
+        };
     }
     JWT{check: false, claims: Claims{company: "".to_owned(), exp: 0, sub: "".to_owned()}}
 }
