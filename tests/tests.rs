@@ -5,13 +5,13 @@ use base64::encode;
 #[tokio::test]
 async fn test1() {
 
-    let user1 = json!({"username": "rust22", "password": "rust", "collection_id":"3ca76743-8d99-4d3f-b85c-633ea456f90c"});
-    let user2 = json!({"username": "rust23", "password": "rust", "collection_id":"3ca76743-8d99-4d3f-b85c-633ea456f90d"});
+    let user1 = json!({"username": "rust22", "password": "rust", "collection_id":"3ca76743-8d99-4d3f-b85c-633ea456f90c", "tenant_id": "e69d88c2-135e-4280-9cd8-d4a5edd8642a"});
+    let user2 = json!({"username": "rust23", "password": "rust", "collection_id":"3ca76743-8d99-4d3f-b85c-633ea456f90d", "tenant_id": "e69d88c2-135e-4280-9cd8-d4a5edd8642a"});
     let user1_login = json!({"username": "rust22", "password": "rust"});
-    let event1 = json!({"event": "test", "collection_id": "3ca76743-8d99-4d3f-b85c-633ea456f90c", "timestamp": 1578667309, "data": "{}"});
+    let event1 = json!({"event": "test", "tenant_id": "e69d88c2-135e-4280-9cd8-d4a5edd8642a", "collection_id": "3ca76743-8d99-4d3f-b85c-633ea456f90c", "timestamp": 1578667309, "data": "{}"});
     let now = broker::get_ntp_time();
     let x = now + 1000;
-    let event2 = json!({"event": "user", "collection_id": "3ca76743-8d99-4d3f-b85c-633ea456f90d", "timestamp": x, "data": "{}"});
+    let event2 = json!({"event": "user", "tenant_id": "e69d88c2-135e-4280-9cd8-d4a5edd8642a", "collection_id": "3ca76743-8d99-4d3f-b85c-633ea456f90d", "timestamp": x, "data": "{}"});
 
     let client = reqwest::Client::new();
 

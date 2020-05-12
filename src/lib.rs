@@ -57,6 +57,7 @@ pub struct SSE {
     pub data: String,
     pub id: String,
     pub retry: Duration,
+    pub tenant_id: uuid::Uuid,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -83,6 +84,7 @@ pub struct User {
     username: String,
     password: String,
     collection_id: uuid::Uuid,
+    tenant_id: uuid::Uuid,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -90,6 +92,7 @@ pub struct UserForm {
     username: String,
     password: String,
     collection_id: uuid::Uuid,
+    tenant_id: uuid::Uuid,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -115,6 +118,7 @@ pub struct Event {
     pub id: uuid::Uuid,
     pub user_id: uuid::Uuid,
     pub collection_id: uuid::Uuid,
+    pub tenant_id: uuid::Uuid,
     pub event: String,
     pub timestamp: i64,
     pub published: bool,
@@ -125,13 +129,14 @@ pub struct Event {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct EventForm {
     collection_id: uuid::Uuid,
+    tenant_id: uuid::Uuid,
     event: String,
     timestamp: i64,
     data: serde_json::Value,
 }
 
 // helper function to create sse events
-fn get_events() -> Vec<SSE> {
+fn get_events(tenant_id: uuid::Uuid) -> Vec<SSE> {
     let tree = TREE.get(&"tree".to_owned()).unwrap();
     let mut vals : Vec<Event> = tree.iter().into_iter().filter(|x| {
         let p = x.as_ref().unwrap();
@@ -139,7 +144,7 @@ fn get_events() -> Vec<SSE> {
         if k.contains("_v_") {
             let v = std::str::from_utf8(&p.1).unwrap().to_owned();
             let evt : Event = serde_json::from_str(&v).unwrap();
-            if !evt.cancelled {
+            if !evt.cancelled && evt.tenant_id == tenant_id {
                 return true
             } else {
                 return false
@@ -209,7 +214,7 @@ fn get_events() -> Vec<SSE> {
 
         let guid = Uuid::new_v4().to_string();
         let events_json = json!({"events": evts, "columns": colz, "rows": rows});
-        sse_events.push(SSE{id: guid, event: evt, data: serde_json::to_string(&events_json).unwrap(), retry: Duration::from_millis(5000)});
+        sse_events.push(SSE{id: guid, event: evt, data: serde_json::to_string(&events_json).unwrap(), retry: Duration::from_millis(5000), tenant_id: tenant_id});
     }
     sse_events
 }
@@ -227,16 +232,23 @@ pub fn get_ntp_time() -> i64 {
 }
 
 // cancel future event
-fn cancel(tree: sled::Db, id: String) -> String {
+fn cancel(tree: sled::Db, event_id: String, user_id: String) -> String {
 
-    let versioned = format!("_v_{}", id);
+    let versioned = format!("_u_{}", user_id);
+    let g = tree.get(&versioned.as_bytes()).unwrap().unwrap();
+    let v = std::str::from_utf8(&g).unwrap().to_owned();
+    let user : User = serde_json::from_str(&v).unwrap();
+
+    let versioned = format!("_v_{}", event_id);
     let g = tree.get(&versioned.as_bytes()).unwrap().unwrap();
     let v = std::str::from_utf8(&g).unwrap().to_owned();
     let mut json : Event = serde_json::from_str(&v).unwrap();
     let j = json.clone();
-    json.cancelled = true;
-    let _ = tree.compare_and_swap(versioned.as_bytes(), Some(serde_json::to_string(&j).unwrap().as_bytes()), Some(serde_json::to_string(&json).unwrap().as_bytes()));
-    let _ = tree.flush();
+    if json.tenant_id == user.tenant_id {
+        json.cancelled = true;
+        let _ = tree.compare_and_swap(versioned.as_bytes(), Some(serde_json::to_string(&j).unwrap().as_bytes()), Some(serde_json::to_string(&json).unwrap().as_bytes()));
+        let _ = tree.flush();
+    }
     json!({"event": json}).to_string()
 }
 
@@ -302,15 +314,20 @@ fn user_collection(tree: sled::Db, id: String) -> String {
 }
 
 // display collection of events based on collection_id
-fn collection(tree: sled::Db, id: String) -> String {
+fn collection(tree: sled::Db, collection_id: String, user_id: String) -> String {
  
+    let versioned = format!("_u_{}", user_id);
+    let g = tree.get(&versioned.as_bytes()).unwrap().unwrap();
+    let v = std::str::from_utf8(&g).unwrap().to_owned();
+    let user : User = serde_json::from_str(&v).unwrap();
+
     let mut records: Vec<Event> = tree.iter().into_iter().filter(|x| {
         let p = x.as_ref().unwrap();
         let k = std::str::from_utf8(&p.0).unwrap().to_owned();
         if k.contains(&"_v_") {
             let v = std::str::from_utf8(&p.1).unwrap().to_owned();
             let j : Event = serde_json::from_str(&v).unwrap();
-            if j.collection_id.to_string() == id {
+            if j.collection_id.to_string() == collection_id && j.tenant_id == user.tenant_id {
                 return true
             } else {
                 return false
@@ -363,7 +380,7 @@ fn user_create(tree: sled::Db, user_form: UserForm) -> (bool, String) {
         let uuid = Uuid::new_v4();
         let versioned = format!("_u_{}", uuid.to_string());
         let hashed = hash(user_form.clone().password, DEFAULT_COST).unwrap();
-        let new_user = User{id: uuid, username: user_form.clone().username, password: hashed, collection_id: user_form.collection_id };
+        let new_user = User{id: uuid, username: user_form.clone().username, password: hashed, collection_id: user_form.clone().collection_id, tenant_id: user_form.clone().tenant_id };
         
         let _ = tree.compare_and_swap(versioned.as_bytes(), None as Option<&[u8]>, Some(serde_json::to_string(&new_user).unwrap().as_bytes())); 
         let _ = tree.flush();
@@ -514,32 +531,42 @@ fn jwt_verify(config: Config, token: String) -> JWT {
 }
 
 // insert an event
-fn insert(tree: sled::Db, user_id_str: String, evt: EventForm) -> String {
+fn insert(tree: sled::Db, user_id: String, evt: EventForm) -> String {
   
-    let user_id = uuid::Uuid::parse_str(&user_id_str).unwrap();
+    // get user
+    let versioned = format!("_u_{}", user_id);
+    let g = tree.get(&versioned.as_bytes()).unwrap().unwrap();
+    let v = std::str::from_utf8(&g).unwrap().to_owned();
+    let user : User = serde_json::from_str(&v).unwrap();
 
+    // build event object
     let id = Uuid::new_v4();
-    let j = Event{id: id, published: false, cancelled: false, data: evt.data, event: evt.event, timestamp: evt.timestamp, user_id: user_id, collection_id: evt.collection_id};
+    let j = Event{id: id, published: false, cancelled: false, data: evt.data, event: evt.event, timestamp: evt.timestamp, user_id: user.id, collection_id: evt.collection_id, tenant_id: evt.tenant_id};
     let new_value_string = serde_json::to_string(&j).unwrap();
     let new_value = new_value_string.as_bytes();
     let versioned = format!("_v_{}", id.to_string());
 
-    let _ = tree.compare_and_swap(versioned, None as Option<&[u8]>, Some(new_value.clone())); 
-    let _ = tree.flush();
+    // only write if form tenant_id and user tenant_id
+    if user.tenant_id == evt.tenant_id {
+        let _ = tree.compare_and_swap(versioned, None as Option<&[u8]>, Some(new_value.clone())); 
+        let _ = tree.flush();
+        return json!({"event": j}).to_string()
+    }
 
-    json!({"event": j}).to_string()
+    json!({"error": "trying to write to wrong tenant"}).to_string()
 }
 
 // create a sse event
 fn event_stream(rx: crossbeam::channel::Receiver<SSE>, allowed: bool) -> Result<impl ServerSentEvent, Infallible> {
- 
+
     if allowed {
         let sse = match rx.try_recv() {
             Ok(sse) => sse,
             Err(_) => {
-                let guid = Uuid::new_v4().to_string();
+                let id = Uuid::new_v4();
+                let guid = id.to_string();
                 let polling = json!({"status": "polling"});
-                SSE{id: guid, event: "internal_status".to_owned(), data: polling.to_string(), retry: Duration::from_millis(5000)}
+                SSE{id: guid, event: "internal_status".to_owned(), data: polling.to_string(), retry: Duration::from_millis(5000), tenant_id: id}
             }
         };
         Ok((
@@ -549,9 +576,10 @@ fn event_stream(rx: crossbeam::channel::Receiver<SSE>, allowed: bool) -> Result<
             warp::sse::retry(sse.retry),
         ))
     } else {
-        let guid = Uuid::new_v4().to_string();
+        let id = Uuid::new_v4();
+        let guid = id.to_string();
         let denied = json!({"error": "denied"});
-        let sse = SSE{id: guid, event: "internal_status".to_owned(), data: denied.to_string(), retry: Duration::from_millis(5000)};
+        let sse = SSE{id: guid, event: "internal_status".to_owned(), data: denied.to_string(), retry: Duration::from_millis(5000), tenant_id: id};
         Ok((
             warp::sse::id(sse.id),
             warp::sse::data(sse.data),
@@ -668,19 +696,15 @@ pub async fn broker() {
                 let mut new_json = v.clone();
                 new_json.published = true;
                 let newest_json = new_json.clone();
+                let newer_json = newest_json.clone();
                 let tree_cloned = tree.clone();
 
                 let _ = tokio::spawn(async move {
                     let _ = tree_cloned.compare_and_swap(k, Some(serde_json::to_string(&old_json_clone).unwrap().as_bytes()), Some(serde_json::to_string(&newest_json).unwrap().as_bytes())); 
                     let _ = tree_cloned.flush();
                 }).await;
-
-                // only publish if events match - need to be published
-                for event in get_events() {
-                    if event.event == new_json.event {
-                        tx2.lock().unwrap().broadcast(event);
-                    }
-                }
+                
+                tx2.lock().unwrap().broadcast(newer_json);
             }
         }  
     });
@@ -692,7 +716,8 @@ pub async fn broker() {
     let sse_route = warp::path("events")
         .and(auth_check)
         .and(with_sender)
-        .and(warp::get()).map(move |jwt: JWT, tx_main: Arc<Mutex<bus::Bus<SSE>>>| {
+        .and(warp::path::param::<uuid::Uuid>())
+        .and(warp::get()).map(move |jwt: JWT, tx_main: Arc<Mutex<bus::Bus<Event>>>, tenant_id: uuid::Uuid| {
 
         // create recv for bus (each sse instance must have its own)
         let mut rx_main = tx_main.lock().unwrap().add_rx();
@@ -701,21 +726,29 @@ pub async fn broker() {
         let (tx, rx) = unbounded();
 
         // loop through sse events to send on load of sse route
-        for event in get_events() {
+        for event in get_events(tenant_id) {
             let _ = tx.send(event);
         }
 
         // every 100ms check the bus and if any messages send to local channel also check local channel and publish to stream (sse route)
         let event_stream = interval(Duration::from_millis(100)).map(move |_| {
-            let sse = match rx_main.try_recv() {
-                Ok(sse) => sse,
+            let evt = match rx_main.try_recv() {
+                Ok(evt) => {
+                    if tenant_id == evt.tenant_id {
+                        evt
+                    } else {
+                        let id = Uuid::new_v4();
+                        Event{id: id, published: false, cancelled: false, data: json!({"test": "test"}), event: "fake".to_owned(), timestamp: 123, user_id: id, collection_id: id, tenant_id: id}
+                    }
+                },
                 Err(_) => {
-                    let guid = Uuid::new_v4().to_string();
-                    let polling = json!({"status": "polling"});
-                    SSE{id: guid, event: "internal_status".to_owned(), data: polling.to_string(), retry: Duration::from_millis(5000)}
+                    let id = Uuid::new_v4();
+                    Event{id: id, published: false, cancelled: false, data: json!({"test": "test"}), event: "fake".to_owned(), timestamp: 123, user_id: id, collection_id: id, tenant_id: id}
                 }
             };
-            let _ = tx.send(sse);
+            for event in get_events(evt.tenant_id) {
+                let _ = tx.send(event);
+            }
             event_stream(rx.clone(), jwt.check)
         });
         warp::sse::reply(event_stream)
@@ -726,10 +759,10 @@ pub async fn broker() {
         .and(warp::path("cancel"))
         .and(auth_check)
         .and(warp::path::param::<String>())
-        .map(move |jwt: JWT, id: String| {
+        .map(move |jwt: JWT, event_id: String| {
             if jwt.check {
                 let tree = TREE.get(&"tree".to_owned()).unwrap();
-                let record = cancel(tree.clone(), id);
+                let record = cancel(tree.clone(), event_id, jwt.claims.sub);
                 let reply = warp::reply::with_status(record, StatusCode::OK);
                 warp::reply::with_header(reply, "Content-Type", "application/json")
             } else {
@@ -743,10 +776,10 @@ pub async fn broker() {
         .and(warp::path("collections"))
         .and(auth_check)
         .and(warp::path::param::<String>())
-        .map(move |jwt: JWT, id: String| {
+        .map(move |jwt: JWT, collection_id: String| {
             if jwt.check {
                 let tree = TREE.get(&"tree".to_owned()).unwrap();
-                let record = collection(tree.clone(), id);
+                let record = collection(tree.clone(), collection_id, jwt.claims.sub);
                 let reply = warp::reply::with_status(record, StatusCode::OK);
                 warp::reply::with_header(reply, "Content-Type", "application/json")
             } else {
@@ -773,7 +806,12 @@ pub async fn broker() {
 
     // create cors wrapper
     let configure = config();
-    let cors = warp::cors().allow_origin(&*configure.origin).allow_methods(vec!["GET", "POST"]).allow_headers(vec![warp::http::header::AUTHORIZATION, warp::http::header::CONTENT_TYPE]);
+    let mut cors = warp::cors().allow_origin(&*configure.origin).allow_methods(vec!["GET", "POST"]).allow_headers(vec![warp::http::header::AUTHORIZATION, warp::http::header::CONTENT_TYPE]);
+
+    // handle allow any origin case
+    if configure.origin == "*" {
+        cors = warp::cors().allow_any_origin().allow_methods(vec!["GET", "POST"]).allow_headers(vec![warp::http::header::AUTHORIZATION, warp::http::header::CONTENT_TYPE]);
+    }
 
     // create routes
     let routes = warp::any().and(login_route).or(user_create_route).or(insert_route).or(sse_route).or(cancel_route).or(collections_route).or(user_collection_route).with(cors);

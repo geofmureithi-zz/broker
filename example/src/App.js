@@ -18,7 +18,7 @@ function Insert(props) {
   const onSubmit = values => {
     const apiEndpoint = process.env.REACT_APP_API + '/insert';
     const vals = JSON.stringify(values);
-    const v = `{"collection_id": "${id}", "event": "covid", "timestamp": ${stamp}, "data": ${vals} }`;
+    const v = `{"collection_id": "${id}", "tenant_id":"112718d1-a0be-4468-b902-0749c3d964ae", "event": "covid", "timestamp": ${stamp}, "data": ${vals} }`;
     fetch(apiEndpoint, {
       method: 'post',
       mode: 'cors',
@@ -80,7 +80,8 @@ function Insert(props) {
 
 function Load(props) {
   const { handleSubmit, register, errors } = useForm();
-
+  const sseURL = `${process.env.REACT_APP_API}/events/${process.env.REACT_APP_TENANT}`;
+  const insertURL = `${process.env.REACT_APP_API}/insert`;
   return (
     <Router>
       <div>
@@ -93,7 +94,7 @@ function Load(props) {
               }
               {props.jwt.length > 0 && 
                 <div class="mt-20 mx-20">
-                  <Grid endpoint={process.env.REACT_APP_API} eventListen={'covid'} title={'Fight Covid'} token={props.jwt} />
+                  <Grid sseEndpoint={sseURL} tenantID={process.env.REACT_APP_TENANT} insertEndpoint={insertURL} eventListen={'covid'} title={'Fight Covid'} token={props.jwt} />
                 </div>
               }
           </Route>

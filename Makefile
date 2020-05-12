@@ -1,5 +1,5 @@
 run:
-	SAVE_PATH=./tmp/broker_data cargo run
+	SAVE_PATH=./tmp/broker_data ORIGIN=* cargo run
 release:
 	SAVE_PATH=./tmp/broker_data cargo run --release
 build:

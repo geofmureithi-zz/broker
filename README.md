@@ -17,6 +17,7 @@ Broker follows an insert-only/publish/subscribe paradigm rather than a REST CRUD
 * Very performant with a low memory footprint that uses about 20MB and 2 CPU threads
 * Under 1,000 lines of code
 * Secure Real-time Event Stream via SSE - requires the use of [broker-client](https://www.npmjs.com/package/broker-client)
+* Multi-tenanted
 * Supports CORS
 * Supports SSL - full end-to-end encryption
 * Provides user authentication with JWTs or HTTP Basic with stored Bcrypt(ed) passwords
@@ -63,9 +64,9 @@ POST /users
 - public endpoint
 - POST JSON to create a user
 ```json
-{"username":{...}, "password":{...}, "collection_id":{...}}
+{"username":{...}, "password":{...}, "collection_id":{...}, "tenant_id":{...}}
 ```
-- where {...} is for username and string, password a string, and collection_id is the uuid of the event collection for user info
+- where {...} is for username and string, password a string, collection_id is the uuid of the event collection for user info, tenant_id is the uuid of the tenant
 
 will return
 ```json
@@ -94,8 +95,9 @@ will return
 #### Step 3 - connect to SSE
 
 ```html 
-GET /events 
+GET /events/{id}
 ```
+- where {id} is the tenant_id
 - authenticated endpoint (Authorization: Bearer {jwt}) or (Authorization: Basic {base64})
 - connect your sse-client to this endpoint using [broker-client](https://www.npmjs.com/package/broker-client)
 - note: broker-client uses fetch as eventsource doesn't support headers
@@ -108,9 +110,9 @@ POST /insert
 - authenticated endpoint (Authorization: Bearer {jwt}) or (Authorization: Basic {base64})
 - POST JSON to insert an event
 ```json
-{"event":{...}, "collection_id":{...}, "timestamp":{...}, "data":{...}}
+{"event":{...}, "tenant_id":{...}, "collection_id":{...}, "timestamp":{...}, "data":{...}}
 ```
-- where {...} is for the event a string, collection_id is an assigned uuid v4 for the event collection, timestamp is the epoch unix timestamp when you want the event to become the current event, and data is any JSON you want
+- where {...} is for the event a string, tenant_id is an assigned uuid v4 for the tenant, collection_id is an assigned uuid v4 for the event collection, timestamp is the epoch unix timestamp when you want the event to become the current event, and data is any JSON you want
 
 will return
 ```json
@@ -124,7 +126,7 @@ will return
 GET /collections/{collection_id}
 ```
 - authenticated endpoint (Authorization: Bearer {jwt}) or (Authorization: Basic {base64})
-- do a GET request where {collection_id} is the uuid of the collection you want (sorted by ascending timestamp)
+- do a GET request where {collection_id} is the uuid of the collection you want (sorted by ascending timestamp) for the user's tenant
 
 will return
 ```json
@@ -148,7 +150,7 @@ will return
 GET /cancel/{id}
 ``` 
 - authenticated endpoint (Authorization: Bearer {jwt}) or (Authorization: Basic {base64})
-- do a GET request where id is the uuid of the event to cancel a future event
+- do a GET request where id is the uuid of the event to cancel a future event for the user's tenant
 
 will return
 ```json
@@ -169,7 +171,7 @@ pub async fn main() {
 OR
 ``` cargo install broker ```
 
-- the origin needs to be passed in as a flag - wildcard is not supported - default http://localhost:3000
+- the origin needs to be passed in as a flag - wildcard is supported - default http://localhost:3000
 - the port needs to be passed in as a flag - default 8080
 - the expiry (for jwts) needs to be passed in as a flag - default 3600
 - the secret (for jwts) needs to be passed in as a flag - default secret
@@ -196,6 +198,7 @@ OR
 
 ### Migrations
 
+- from 4.0 to 5.0: multi-tenancy has been added and sled has been upgraded - there is no upgrade path from 4.0 to 5.0
 - from 3.0 to 4.0: the sse endpoint now returns all events with all collections with the latest collection event rather than just the latest event data for all event types
 - from 2.0 to 3.0: the sse endpoint is now secure and requires the use of the [broker-client](https://www.npmjs.com/package/broker-client) library
 - from 1.0 to 2.0: the optional API endpoints URLs have been changed but have the same functionality
